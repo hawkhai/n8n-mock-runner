@@ -16,15 +16,16 @@
  *  - No pagination
  */
 
-import type { IDataObject, INodeExecutionData, INodeType, IVersionedNodeType, NodeExecutionHint } from './n8n-types';
+import type {
+  IDataObject,
+  INodeExecutionData,
+  INodeType,
+  IVersionedNodeType,
+  NodeExecutionHint,
+} from './n8n-types';
 import { normalizeItems } from './helpers';
 import { runNode } from './node-runner';
-import type {
-  WorkflowJson,
-  WorkflowNode,
-  WorkflowRunOptions,
-  WorkflowRunResult,
-} from './types';
+import type { WorkflowJson, WorkflowNode, WorkflowRunOptions, WorkflowRunResult } from './types';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Graph helpers
@@ -178,7 +179,8 @@ function evalWorkflowExpression(
       $node,
       $env,
       // $evaluateExpression — nested evaluation (limited support)
-      (expr: string) => evalWorkflowExpression(`=\{\{${expr}\}\}`, currentJson, parameters, nodeResults),
+      (expr: string) =>
+        evalWorkflowExpression(`=\{\{${expr}\}\}`, currentJson, parameters, nodeResults),
     );
   } catch {
     return expression;
@@ -194,7 +196,12 @@ function resolveParameters(
   const resolved: IDataObject = {};
   for (const [key, value] of Object.entries(parameters)) {
     if (typeof value === 'string' && value.startsWith('={{')) {
-      resolved[key] = evalWorkflowExpression(value, itemJson, parameters, nodeResults) as IDataObject[string];
+      resolved[key] = evalWorkflowExpression(
+        value,
+        itemJson,
+        parameters,
+        nodeResults,
+      ) as IDataObject[string];
     } else if (value && typeof value === 'object' && !Array.isArray(value)) {
       resolved[key] = resolveParameters(value as IDataObject, itemJson, nodeResults);
     } else {
@@ -294,8 +301,7 @@ export async function runWorkflow(
     }
 
     // Resolve node type
-    const nodeTypeInstance: INodeType | IVersionedNodeType | undefined =
-      nodeTypes[nodeDef.type];
+    const nodeTypeInstance: INodeType | IVersionedNodeType | undefined = nodeTypes[nodeDef.type];
 
     if (!nodeTypeInstance) {
       // Skip unknown node types (e.g. n8n-nodes-base.* we don't have), emit hint

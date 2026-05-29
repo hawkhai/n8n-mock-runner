@@ -97,12 +97,11 @@ function evalExpression(
     // new Function is intentional here: this is a test-time expression evaluator,
     // not production code exposed to untrusted input.
     // eslint-disable-next-line no-new-func
-    const fn = new Function(
-      '$json',
-      '$parameter',
-      '$env',
-      `"use strict"; return (${code});`,
-    ) as ($json: IDataObject, $parameter: IDataObject, $env: IDataObject) => unknown;
+    const fn = new Function('$json', '$parameter', '$env', `"use strict"; return (${code});`) as (
+      $json: IDataObject,
+      $parameter: IDataObject,
+      $env: IDataObject,
+    ) => unknown;
     return fn($json, $parameter, $env);
   } catch {
     return expression;
@@ -129,7 +128,9 @@ async function doHttpRequest(
   const params = options.qs ?? options.params;
   const rawAuth = options.auth as { username?: string; password?: string } | undefined;
   const auth =
-    rawAuth?.username !== undefined ? { username: rawAuth.username, password: rawAuth.password ?? '' } : undefined;
+    rawAuth?.username !== undefined
+      ? { username: rawAuth.username, password: rawAuth.password ?? '' }
+      : undefined;
 
   const response = await axios({ method, url, headers, data, params, auth });
   return response.data;
@@ -484,11 +485,21 @@ export function createExecuteContext(opts: RunNodeOptions) {
     },
 
     logger: {
-      debug: (..._args: unknown[]) => { /* noop */ },
-      info: (..._args: unknown[]) => { /* noop */ },
-      warn: (..._args: unknown[]) => { /* noop */ },
-      error: (..._args: unknown[]) => { /* noop */ },
-      verbose: (..._args: unknown[]) => { /* noop */ },
+      debug: (..._args: unknown[]) => {
+        /* noop */
+      },
+      info: (..._args: unknown[]) => {
+        /* noop */
+      },
+      warn: (..._args: unknown[]) => {
+        /* noop */
+      },
+      error: (..._args: unknown[]) => {
+        /* noop */
+      },
+      verbose: (..._args: unknown[]) => {
+        /* noop */
+      },
     },
 
     customData: {},

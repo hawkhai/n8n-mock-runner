@@ -6,7 +6,12 @@
  * legacy nodes that call this.prepareOutputData().
  */
 
-import type { INodeExecutionData, INodeType, IVersionedNodeType, NodeExecutionHint } from './n8n-types';
+import type {
+  INodeExecutionData,
+  INodeType,
+  IVersionedNodeType,
+  NodeExecutionHint,
+} from './n8n-types';
 
 import { createExecuteContext } from './execute-context';
 import { runRoutingNode } from './routing-executor';

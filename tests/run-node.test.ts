@@ -93,9 +93,9 @@ describe('runNode()', () => {
       },
     };
 
-    await expect(runNode({ node: noExecNode as any, parameters: {}, silent: true })).rejects.toThrow(
-      /no execute\(\) method/i,
-    );
+    await expect(
+      runNode({ node: noExecNode as any, parameters: {}, silent: true }),
+    ).rejects.toThrow(/no execute\(\) method/i);
   });
 });
 
@@ -583,7 +583,9 @@ describe('validateNode()', () => {
   it('returns valid:true for a well-formed node', () => {
     const result = validateNode(new ExampleNode());
     // ExampleNode is minimal — may have info-level issues (missing subtitle) but no errors
-    expect(result.errors.filter((e) => e.rule !== 'SUBTITLE_MISSING_IN_NODE_DESCRIPTION')).toHaveLength(0);
+    expect(
+      result.errors.filter((e) => e.rule !== 'SUBTITLE_MISSING_IN_NODE_DESCRIPTION'),
+    ).toHaveLength(0);
   });
 
   it('catches missing displayName', () => {
@@ -805,7 +807,9 @@ describe('runWorkflow()', () => {
       silent: true,
     });
 
-    expect(result.hints.some((h) => h.type === 'warning' && h.message.includes('UnknownNode'))).toBe(true);
+    expect(
+      result.hints.some((h) => h.type === 'warning' && h.message.includes('UnknownNode')),
+    ).toBe(true);
   });
 
   it('collects hints from all nodes across the workflow', async () => {

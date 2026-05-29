@@ -12,7 +12,12 @@
  *   NameValidator, MiscellaneousValidator, OptionsValidator.
  */
 
-import type { INodeType, INodeTypeDescription, INodeProperties, IVersionedNodeType } from './n8n-types';
+import type {
+  INodeType,
+  INodeTypeDescription,
+  INodeProperties,
+  IVersionedNodeType,
+} from './n8n-types';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Result types
@@ -56,7 +61,22 @@ function info(rule: string, message: string, path?: string): ValidationIssue {
 
 function isTitleCase(str: string): boolean {
   // Each "word" (split by space) should start with uppercase or be a short word
-  const shortWords = new Set(['a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by']);
+  const shortWords = new Set([
+    'a',
+    'an',
+    'the',
+    'and',
+    'or',
+    'but',
+    'in',
+    'on',
+    'at',
+    'to',
+    'for',
+    'of',
+    'with',
+    'by',
+  ]);
   return str.split(/\s+/).every((word, i) => {
     if (i === 0 || !shortWords.has(word.toLowerCase())) {
       return /^[A-Z0-9]/.test(word);
@@ -75,7 +95,12 @@ function validateNodeDescription(desc: INodeTypeDescription): ValidationIssue[] 
   // Required string fields
   for (const field of ['displayName', 'name', 'description'] as const) {
     if (!desc[field] || typeof desc[field] !== 'string' || !(desc[field] as string).trim()) {
-      issues.push(err(`MISSING_${field.toUpperCase()}`, `Node description is missing required field: ${field}`));
+      issues.push(
+        err(
+          `MISSING_${field.toUpperCase()}`,
+          `Node description is missing required field: ${field}`,
+        ),
+      );
     }
   }
 
@@ -95,42 +120,52 @@ function validateNodeDescription(desc: INodeTypeDescription): ValidationIssue[] 
   if (isTrigger) {
     if (Array.isArray(inputs) && inputs.length !== 0) {
       issues.push(
-        err('WRONG_NUMBER_OF_INPUTS_IN_TRIGGER_NODE_DESCRIPTION',
-          'Trigger nodes must have 0 inputs')
+        err(
+          'WRONG_NUMBER_OF_INPUTS_IN_TRIGGER_NODE_DESCRIPTION',
+          'Trigger nodes must have 0 inputs',
+        ),
       );
     }
     if (!String(desc.displayName ?? '').endsWith('Trigger')) {
       issues.push(
-        err('DISPLAYNAME_NOT_ENDING_WITH_TRIGGER_IN_NODE_DESCRIPTION',
-          "Trigger node displayName must end with ' Trigger'")
+        err(
+          'DISPLAYNAME_NOT_ENDING_WITH_TRIGGER_IN_NODE_DESCRIPTION',
+          "Trigger node displayName must end with ' Trigger'",
+        ),
       );
     }
     if (!String(desc.name ?? '').endsWith('Trigger')) {
       issues.push(
-        err('NAME_NOT_ENDING_WITH_TRIGGER_IN_NODE_DESCRIPTION',
-          "Trigger node name must end with 'Trigger'")
+        err(
+          'NAME_NOT_ENDING_WITH_TRIGGER_IN_NODE_DESCRIPTION',
+          "Trigger node name must end with 'Trigger'",
+        ),
       );
     }
   } else {
     if (!Array.isArray(inputs) || inputs.length === 0) {
       issues.push(
-        err('WRONG_NUMBER_OF_INPUTS_IN_REGULAR_NODE_DESCRIPTION',
-          'Regular nodes must have at least 1 input')
+        err(
+          'WRONG_NUMBER_OF_INPUTS_IN_REGULAR_NODE_DESCRIPTION',
+          'Regular nodes must have at least 1 input',
+        ),
       );
     }
   }
 
   if (!Array.isArray(outputs) || outputs.length === 0) {
     issues.push(
-      err('WRONG_NUMBER_OF_OUTPUTS_IN_NODE_DESCRIPTION', 'Node must have at least 1 output')
+      err('WRONG_NUMBER_OF_OUTPUTS_IN_NODE_DESCRIPTION', 'Node must have at least 1 output'),
     );
   }
 
   // subtitle (info-level)
   if (!desc.subtitle) {
     issues.push(
-      info('SUBTITLE_MISSING_IN_NODE_DESCRIPTION',
-        'Node description should have a subtitle for the editor panel')
+      info(
+        'SUBTITLE_MISSING_IN_NODE_DESCRIPTION',
+        'Node description should have a subtitle for the editor panel',
+      ),
     );
   }
 
@@ -143,16 +178,20 @@ function validateNodeDescription(desc: INodeTypeDescription): ValidationIssue[] 
   // displayName title-case (nodelinter: DISPLAYNAME_WITH_NO_TITLECASE)
   const displayName = desc.displayName ?? '';
   if (displayName && !isTitleCase(displayName.replace(/ Trigger$/, ''))) {
-    issues.push(warn('DISPLAYNAME_WITH_NO_TITLECASE', `displayName "${displayName}" should be Title Case`));
+    issues.push(
+      warn('DISPLAYNAME_WITH_NO_TITLECASE', `displayName "${displayName}" should be Title Case`),
+    );
   }
 
   // Credential naming: each credential name should end with Api suffix
   for (const cred of desc.credentials ?? []) {
     if (!cred.name.endsWith('Api') && !cred.name.endsWith('OAuth2Api')) {
       issues.push(
-        warn('NON_SUFFIXED_CREDENTIALS_NAME',
+        warn(
+          'NON_SUFFIXED_CREDENTIALS_NAME',
           `Credential name "${cred.name}" should end with "Api" (e.g. "myServiceApi")`,
-          `credentials[${cred.name}]`)
+          `credentials[${cred.name}]`,
+        ),
       );
     }
   }
@@ -165,7 +204,13 @@ function validateNodeDescription(desc: INodeTypeDescription): ValidationIssue[] 
 // ─────────────────────────────────────────────────────────────────────────────
 
 const PROPERTY_TYPES_WITH_REQUIRED_DEFAULT = new Set([
-  'string', 'number', 'boolean', 'options', 'multiOptions', 'collection', 'fixedCollection',
+  'string',
+  'number',
+  'boolean',
+  'options',
+  'multiOptions',
+  'collection',
+  'fixedCollection',
 ]);
 
 function validateProperty(prop: INodeProperties, path: string): ValidationIssue[] {
@@ -178,25 +223,64 @@ function validateProperty(prop: INodeProperties, path: string): ValidationIssue[
     prop.default === undefined &&
     !prop.required
   ) {
-    issues.push(err('DEFAULT_MISSING', `Property "${prop.name}" of type "${prop.type}" is missing a default value`, propPath));
+    issues.push(
+      err(
+        'DEFAULT_MISSING',
+        `Property "${prop.name}" of type "${prop.type}" is missing a default value`,
+        propPath,
+      ),
+    );
   }
 
   // Type-specific default checks
   if (prop.default !== undefined) {
     if (prop.type === 'string' && typeof prop.default !== 'string') {
-      issues.push(err('WRONG_DEFAULT_FOR_STRING_TYPE_PARAM', `Property "${prop.name}" has type "string" but default is not a string`, propPath));
+      issues.push(
+        err(
+          'WRONG_DEFAULT_FOR_STRING_TYPE_PARAM',
+          `Property "${prop.name}" has type "string" but default is not a string`,
+          propPath,
+        ),
+      );
     }
     if (prop.type === 'number' && typeof prop.default !== 'number') {
-      issues.push(err('WRONG_DEFAULT_FOR_NUMBER_TYPE_PARAM', `Property "${prop.name}" has type "number" but default is not a number`, propPath));
+      issues.push(
+        err(
+          'WRONG_DEFAULT_FOR_NUMBER_TYPE_PARAM',
+          `Property "${prop.name}" has type "number" but default is not a number`,
+          propPath,
+        ),
+      );
     }
     if (prop.type === 'boolean' && typeof prop.default !== 'boolean') {
-      issues.push(err('WRONG_DEFAULT_FOR_BOOLEAN_TYPE_PARAM', `Property "${prop.name}" has type "boolean" but default is not a boolean`, propPath));
+      issues.push(
+        err(
+          'WRONG_DEFAULT_FOR_BOOLEAN_TYPE_PARAM',
+          `Property "${prop.name}" has type "boolean" but default is not a boolean`,
+          propPath,
+        ),
+      );
     }
     if (prop.type === 'multiOptions' && !Array.isArray(prop.default)) {
-      issues.push(err('WRONG_DEFAULT_FOR_MULTIOPTIONS_TYPE_PARAM', `Property "${prop.name}" has type "multiOptions" but default is not an array`, propPath));
+      issues.push(
+        err(
+          'WRONG_DEFAULT_FOR_MULTIOPTIONS_TYPE_PARAM',
+          `Property "${prop.name}" has type "multiOptions" but default is not an array`,
+          propPath,
+        ),
+      );
     }
-    if (prop.type === 'collection' && (typeof prop.default !== 'object' || Array.isArray(prop.default))) {
-      issues.push(err('WRONG_DEFAULT_FOR_COLLECTION_TYPE_PARAM', `Property "${prop.name}" has type "collection" but default is not an object`, propPath));
+    if (
+      prop.type === 'collection' &&
+      (typeof prop.default !== 'object' || Array.isArray(prop.default))
+    ) {
+      issues.push(
+        err(
+          'WRONG_DEFAULT_FOR_COLLECTION_TYPE_PARAM',
+          `Property "${prop.name}" has type "collection" but default is not an object`,
+          propPath,
+        ),
+      );
     }
   }
 
@@ -209,7 +293,7 @@ function validateProperty(prop: INodeProperties, path: string): ValidationIssue[
           : 'OPERATION_WITHOUT_NO_DATA_EXPRESSION',
         `Property "${prop.name}" must set noDataExpression: true`,
         propPath,
-      )
+      ),
     );
   }
 
@@ -218,17 +302,19 @@ function validateProperty(prop: INodeProperties, path: string): ValidationIssue[
     for (const opt of prop.options) {
       if ('name' in opt && typeof opt.name === 'string' && !isTitleCase(opt.name)) {
         issues.push(
-          warn('OPTIONS_NAME_WITH_NO_TITLECASE',
+          warn(
+            'OPTIONS_NAME_WITH_NO_TITLECASE',
             `Option name "${opt.name}" in property "${prop.name}" should be Title Case`,
-            `${propPath}.options[${opt.name as string}]`)
+            `${propPath}.options[${opt.name as string}]`,
+          ),
         );
       }
     }
 
     // Alphabetization for >5 options (nodelinter: NON_ALPHABETIZED_OPTIONS_IN_OPTIONS_TYPE_PARAM)
     const optionNames = (prop.options as Array<{ name?: string }>)
-      .filter(o => typeof o.name === 'string')
-      .map(o => (o.name as string).toLowerCase());
+      .filter((o) => typeof o.name === 'string')
+      .map((o) => (o.name as string).toLowerCase());
     if (optionNames.length > 5) {
       const sorted = [...optionNames].sort();
       const isAlpha = optionNames.every((n, i) => n === sorted[i]);
@@ -240,7 +326,7 @@ function validateProperty(prop: INodeProperties, path: string): ValidationIssue[
               : 'NON_ALPHABETIZED_OPTIONS_IN_MULTIOPTIONS_TYPE_PARAM',
             `Property "${prop.name}" has >5 ${prop.type} options that are not alphabetized`,
             propPath,
-          )
+          ),
         );
       }
     }
@@ -249,15 +335,33 @@ function validateProperty(prop: INodeProperties, path: string): ValidationIssue[
   // limit property checks (nodelinter: LimitValidator)
   if (prop.name === 'limit' || prop.name === 'maxResults') {
     if (!prop.typeOptions) {
-      issues.push(err('LIMIT_WITHOUT_TYPE_OPTIONS', `"${prop.name}" property should have typeOptions (e.g. minValue: 1)`, propPath));
+      issues.push(
+        err(
+          'LIMIT_WITHOUT_TYPE_OPTIONS',
+          `"${prop.name}" property should have typeOptions (e.g. minValue: 1)`,
+          propPath,
+        ),
+      );
     } else {
       const minValue = (prop.typeOptions as Record<string, unknown>).minValue as number | undefined;
       if (minValue !== undefined && minValue < 1) {
-        issues.push(err('LIMIT_WITH_MIN_VALUE_LOWER_THAN_ONE', `"${prop.name}" minValue should be >= 1`, propPath));
+        issues.push(
+          err(
+            'LIMIT_WITH_MIN_VALUE_LOWER_THAN_ONE',
+            `"${prop.name}" minValue should be >= 1`,
+            propPath,
+          ),
+        );
       }
     }
     if (prop.default !== 50) {
-      issues.push(info('WRONG_DEFAULT_FOR_LIMIT_PARAM', `"${prop.name}" default should be 50 (got ${String(prop.default)})`, propPath));
+      issues.push(
+        info(
+          'WRONG_DEFAULT_FOR_LIMIT_PARAM',
+          `"${prop.name}" default should be 50 (got ${String(prop.default)})`,
+          propPath,
+        ),
+      );
     }
   }
 
@@ -265,16 +369,24 @@ function validateProperty(prop: INodeProperties, path: string): ValidationIssue[
   if (prop.type === 'boolean' && prop.description && typeof prop.description === 'string') {
     if (!prop.description.startsWith('Whether')) {
       issues.push(
-        warn('BOOLEAN_DESCRIPTION_NOT_STARTING_WITH_WHETHER',
+        warn(
+          'BOOLEAN_DESCRIPTION_NOT_STARTING_WITH_WHETHER',
           `Boolean property "${prop.name}" description should start with "Whether"`,
-          propPath)
+          propPath,
+        ),
       );
     }
   }
 
   // Required: false is redundant (nodelinter: REQUIRED_FALSE)
   if (prop.required === false) {
-    issues.push(warn('REQUIRED_FALSE', `Property "${prop.name}" has explicit required: false (it is false by default, remove it)`, propPath));
+    issues.push(
+      warn(
+        'REQUIRED_FALSE',
+        `Property "${prop.name}" has explicit required: false (it is false by default, remove it)`,
+        propPath,
+      ),
+    );
   }
 
   return issues;
