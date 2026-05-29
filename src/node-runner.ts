@@ -52,6 +52,19 @@ function resolveNodeType(node: INodeType | IVersionedNodeType): INodeType {
 export async function runNode(opts: RunNodeOptions): Promise<RunNodeResult> {
   const nodeType = resolveNodeType(opts.node);
 
+  // ── proof banner ──────────────────────────────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { version: runnerVersion } = require('../package.json') as { version: string };
+  const nd = nodeType.description;
+  console.log(
+    `\n[n8n-mock-runner v${runnerVersion}] ` +
+    `node="${nd?.displayName ?? opts.nodeType}" ` +
+    `type="${nd?.name ?? '?'}" ` +
+    `nodeVersion=${nd?.version ?? '?'} ` +
+    `package="${opts.nodeType ?? '?'}"`,
+  );
+  // ─────────────────────────────────────────────────────────────────────────
+
   if (!nodeType.execute) {
     throw new Error(
       `Node "${opts.nodeType ?? 'unknown'}" does not have an execute() method. ` +
