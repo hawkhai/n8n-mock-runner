@@ -61,6 +61,17 @@ export interface INodeExecutionData {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Execution hints
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Informational hints a node can attach to its run (shown in the output pane). */
+export interface NodeExecutionHint {
+  message: string;
+  location?: 'outputPane' | 'inputPane';
+  type?: 'info' | 'warning' | 'danger';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Node connection types
 // ─────────────────────────────────────────────────────────────────────────────
 

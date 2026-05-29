@@ -1,6 +1,12 @@
-import type { IDataObject, INodeExecutionData, INodeType, IVersionedNodeType } from './n8n-types';
+import type {
+  IDataObject,
+  INodeExecutionData,
+  INodeType,
+  IVersionedNodeType,
+  NodeExecutionHint,
+} from './n8n-types';
 
-export type { IDataObject, INodeExecutionData, INodeType, IVersionedNodeType };
+export type { IDataObject, INodeExecutionData, INodeType, IVersionedNodeType, NodeExecutionHint };
 
 /** One input/output item */
 export type JsonItem = Record<string, unknown>;
@@ -101,6 +107,13 @@ export interface RunNodeOptions {
    * Workflow execution mode. Defaults to "manual".
    */
   mode?: string;
+
+  /**
+   * Suppress the proof banner that is normally logged to console on each run.
+   * Useful in CI or when embedding runNode() inside larger test suites.
+   * Defaults to false.
+   */
+  silent?: boolean;
 }
 
 /**
@@ -111,4 +124,86 @@ export interface RunNodeResult {
   items: INodeExecutionData[];
   /** All output channels, indexed by output index */
   outputs: INodeExecutionData[][];
+  /** Execution hints emitted by the node via addExecutionHints() */
+  hints: NodeExecutionHint[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Workflow runner types
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** A node entry inside a workflow JSON file (as exported from n8n). */
+export interface WorkflowNode {
+  id: string;
+  name: string;
+  type: string;
+  typeVersion: number;
+  parameters: IDataObject;
+  position: [number, number];
+  credentials?: Record<string, { id: string; name: string }>;
+  notes?: string;
+  disabled?: boolean;
+  webhookId?: string;
+}
+
+/** Connection target inside connections map. */
+export interface WorkflowConnection {
+  node: string;
+  type: string;
+  index: number;
+}
+
+/**
+ * Workflow JSON as exported from n8n.
+ * Matches the format used in n8n-io/test-workflows.
+ */
+export interface WorkflowJson {
+  id?: string | number;
+  name?: string;
+  nodes: WorkflowNode[];
+  /** Keyed by source node name → connection type → output index → targets */
+  connections: Record<string, Record<string, WorkflowConnection[][]>>;
+  settings?: IDataObject;
+  /** Pre-pinned node output data — bypasses execution for pinned nodes. */
+  pinData?: Record<string, INodeExecutionData[] | IDataObject[]>;
+  staticData?: IDataObject;
+}
+
+/** Options for runWorkflow() */
+export interface WorkflowRunOptions {
+  /**
+   * Map of n8n node type strings to instantiated node objects.
+   * Example: `{ 'n8n-nodes-sqlite.sqlite': new Sqlite() }`
+   */
+  nodeTypes: Record<string, INodeType | IVersionedNodeType>;
+
+  /** Credentials keyed by credential type name. */
+  credentials?: CredentialsMap;
+
+  /** Credential type definitions for IAuthenticateGeneric simulation. */
+  credentialTypes?: CredentialTypeMap;
+
+  /** HTTP interceptor applied to all nodes in the workflow. */
+  httpInterceptor?: HttpRequestInterceptor;
+
+  /** Timezone. Defaults to UTC. */
+  timezone?: string;
+
+  /** Suppress all banners. Defaults to false. */
+  silent?: boolean;
+}
+
+/** Result of runWorkflow() */
+export interface WorkflowRunResult {
+  /**
+   * Execution results keyed by node name.
+   * Each value is an array of output channels (same shape as RunNodeResult.outputs).
+   */
+  nodeResults: Record<string, INodeExecutionData[][]>;
+
+  /** Final output items (main channel of the last node in execution order). */
+  items: INodeExecutionData[];
+
+  /** All hints collected across all executed nodes. */
+  hints: NodeExecutionHint[];
 }

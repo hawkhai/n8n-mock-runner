@@ -12,8 +12,9 @@
 
 import axios from 'axios';
 import get from 'lodash/get';
-import type { IDataObject, INodeExecutionData } from './n8n-types';
+import type { IDataObject, INodeExecutionData, NodeExecutionHint } from './n8n-types';
 
+import { applyCredentialAuth } from './credential-auth';
 import { constructExecutionMetaData, normalizeItems, returnJsonArray } from './helpers';
 import type {
   CredentialsMap,
@@ -59,6 +60,56 @@ function normalizeInputItems(items: RunNodeOptions['items']): INodeExecutionData
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Expression evaluator
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Evaluate an n8n expression string against the current item and parameters.
+ *
+ * Supports:
+ *   - `={{ $json.field }}` / `={{ $json["field"] }}`  — current item json
+ *   - `={{ $parameter.field }}`                        — node parameter
+ *   - `={{ $env.VAR }}`                                — process.env
+ *   - Any valid JS expression in the `={{  }}` wrapper
+ *
+ * Falls back to returning the raw expression string when evaluation fails or
+ * the expression format is not recognised.
+ */
+function evalExpression(
+  expression: unknown,
+  itemIndex: number,
+  inputItems: INodeExecutionData[],
+  parameters: IDataObject,
+): unknown {
+  if (typeof expression !== 'string') return expression;
+
+  const match = /^=\{\{([\s\S]*)\}\}$/.exec(expression.trim());
+  if (!match) return expression;
+
+  const code = match[1].trim();
+  const currentItem = inputItems[Math.min(itemIndex, Math.max(0, inputItems.length - 1))];
+  const $json = currentItem?.json ?? {};
+  const $parameter = parameters;
+  // eslint-disable-next-line node/no-process-env
+  const $env = process.env as unknown as IDataObject;
+
+  try {
+    // new Function is intentional here: this is a test-time expression evaluator,
+    // not production code exposed to untrusted input.
+    // eslint-disable-next-line no-new-func
+    const fn = new Function(
+      '$json',
+      '$parameter',
+      '$env',
+      `"use strict"; return (${code});`,
+    ) as ($json: IDataObject, $parameter: IDataObject, $env: IDataObject) => unknown;
+    return fn($json, $parameter, $env);
+  } catch {
+    return expression;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // HTTP helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -76,67 +127,12 @@ async function doHttpRequest(
   const headers = (options.headers as Record<string, string>) ?? {};
   const data = options.body ?? options.data;
   const params = options.qs ?? options.params;
+  const rawAuth = options.auth as { username?: string; password?: string } | undefined;
+  const auth =
+    rawAuth?.username !== undefined ? { username: rawAuth.username, password: rawAuth.password ?? '' } : undefined;
 
-  const response = await axios({ method, url, headers, data, params });
+  const response = await axios({ method, url, headers, data, params, auth });
   return response.data;
-}
-
-/**
- * Apply IAuthenticateGeneric-style credential config to request options.
- * This mirrors what the real n8n runtime does before executing authenticated requests.
- */
-function applyCredentialAuth(
-  requestOptions: IDataObject,
-  credentialType: string,
-  credentials: CredentialsMap,
-  credentialTypes: CredentialTypeMap,
-): IDataObject {
-  const credValues = credentials[credentialType] as IDataObject | undefined;
-  const credTypeDef = credentialTypes[credentialType] as IDataObject | undefined;
-
-  if (!credValues || !credTypeDef) return requestOptions;
-
-  const authenticate = credTypeDef.authenticate as IDataObject | undefined;
-  if (!authenticate || authenticate.type !== 'generic') return requestOptions;
-
-  const props = authenticate.properties as IDataObject | undefined;
-  if (!props) return requestOptions;
-
-  const merged: IDataObject = { ...requestOptions };
-
-  const interpolate = (tpl: string) =>
-    tpl.replace(/\{\{[\s]*\$credentials\.(\w+)[\s]*\}\}/g, (_, field: string) =>
-      String(credValues[field] ?? ''),
-    );
-
-  if (props.headers) {
-    const existing = (merged.headers as Record<string, string>) ?? {};
-    const authHdrs: Record<string, string> = {};
-    for (const [key, tpl] of Object.entries(props.headers as Record<string, string>)) {
-      authHdrs[key] = interpolate(tpl);
-    }
-    merged.headers = { ...existing, ...authHdrs };
-  }
-
-  if (props.qs) {
-    const existing = (merged.qs as IDataObject) ?? {};
-    const authQs: IDataObject = {};
-    for (const [key, tpl] of Object.entries(props.qs as Record<string, string>)) {
-      authQs[key] = interpolate(tpl);
-    }
-    merged.qs = { ...existing, ...authQs };
-  }
-
-  if (props.body) {
-    const existing = (merged.body as IDataObject) ?? {};
-    const authBody: IDataObject = {};
-    for (const [key, tpl] of Object.entries(props.body as Record<string, string>)) {
-      authBody[key] = interpolate(tpl);
-    }
-    merged.body = { ...existing, ...authBody };
-  }
-
-  return merged;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -145,7 +141,10 @@ function applyCredentialAuth(
 
 /**
  * Creates a mock IExecuteFunctions context.
- * Cast to `unknown as IExecuteFunctions` in the caller.
+ *
+ * The returned object also carries `_hints` — an array populated when the node
+ * calls `addExecutionHints()`. `node-runner.ts` reads this after execution to
+ * populate `RunNodeResult.hints`.
  */
 export function createExecuteContext(opts: RunNodeOptions) {
   const {
@@ -161,6 +160,9 @@ export function createExecuteContext(opts: RunNodeOptions) {
 
   const inputItems = normalizeInputItems(opts.items);
   const fakeNode = buildFakeNode(nodeType, parameters);
+
+  // Accumulated hints — read by node-runner.ts via ctx._hints after execution.
+  const _hints: NodeExecutionHint[] = [];
 
   // ── helpers object ─────────────────────────────────────────────────────────
   const helpers = {
@@ -246,13 +248,18 @@ export function createExecuteContext(opts: RunNodeOptions) {
     // ---- node parameters ----
     getNodeParameter(
       parameterName: string,
-      _itemIndex: number,
+      itemIndex: number,
       fallbackValue?: unknown,
       options?: { extractValue?: boolean },
     ): unknown {
       const path = options?.extractValue ? `${parameterName}.value` : parameterName;
       const value = get(parameters, path);
-      return value !== undefined ? value : fallbackValue;
+      if (value === undefined) return fallbackValue;
+      // Evaluate expressions in parameter values
+      if (typeof value === 'string' && value.startsWith('={{')) {
+        return evalExpression(value, itemIndex, inputItems, parameters);
+      }
+      return value;
     },
 
     // ---- node metadata ----
@@ -336,12 +343,24 @@ export function createExecuteContext(opts: RunNodeOptions) {
       };
     },
 
-    evaluateExpression(expression: string, _itemIndex: number) {
-      return expression;
+    /**
+     * Evaluate an n8n expression against the current item.
+     * Supports `={{ $json.x }}`, `={{ $parameter.x }}`, `={{ $env.VAR }}`,
+     * and any JS expression in the `={{  }}` wrapper.
+     */
+    evaluateExpression(expression: string, itemIndex: number) {
+      return evalExpression(expression, itemIndex, inputItems, parameters);
     },
 
-    getWorkflowDataProxy(_itemIndex: number) {
-      return {};
+    getWorkflowDataProxy(itemIndex: number) {
+      const item = inputItems[Math.min(itemIndex, Math.max(0, inputItems.length - 1))];
+      return {
+        $json: item?.json ?? {},
+        $parameter: parameters,
+        // eslint-disable-next-line node/no-process-env
+        $env: process.env,
+        $item: (index: number) => ({ $json: inputItems[index]?.json ?? {} }),
+      };
     },
 
     getInputSourceData() {
@@ -354,6 +373,21 @@ export function createExecuteContext(opts: RunNodeOptions) {
 
     onExecutionCancellation(_handler: () => unknown) {
       /* noop */
+    },
+
+    /**
+     * Mirrors the real logNodeOutput: in manual mode, emit to sendMessageToUI;
+     * in other modes, conditionally log to stdout (matching production behaviour).
+     */
+    logNodeOutput(...args: unknown[]): void {
+      if (mode === 'manual') {
+        // In production this sends structured data to the UI; in tests log to console.
+        // eslint-disable-next-line no-console
+        console.log('[node output]', ...args);
+      } else if (process.env.CODE_ENABLE_STDOUT === 'true') {
+        // eslint-disable-next-line no-console
+        console.log(`[Workflow "mock-workflow"][Node "${fakeNode.name}"]`, ...args);
+      }
     },
 
     logAiEvent(_eventName: string, _msg?: string) {
@@ -400,12 +434,17 @@ export function createExecuteContext(opts: RunNodeOptions) {
       return false;
     },
 
+    /** Returns true when the node is being invoked as an AI Agent tool. */
     isToolExecution() {
       return false;
     },
 
-    addExecutionHints(..._hints: unknown[]) {
-      /* noop */
+    /**
+     * Accumulate execution hints. They are returned in RunNodeResult.hints
+     * so callers can inspect warnings without running the full n8n UI.
+     */
+    addExecutionHints(...hints: NodeExecutionHint[]) {
+      _hints.push(...hints);
     },
 
     getNodeInputs() {
@@ -444,28 +483,20 @@ export function createExecuteContext(opts: RunNodeOptions) {
       },
     },
 
-    // logger
     logger: {
-      debug: (..._args: unknown[]) => {
-        /* noop */
-      },
-      info: (..._args: unknown[]) => {
-        /* noop */
-      },
-      warn: (..._args: unknown[]) => {
-        /* noop */
-      },
-      error: (..._args: unknown[]) => {
-        /* noop */
-      },
-      verbose: (..._args: unknown[]) => {
-        /* noop */
-      },
+      debug: (..._args: unknown[]) => { /* noop */ },
+      info: (..._args: unknown[]) => { /* noop */ },
+      warn: (..._args: unknown[]) => { /* noop */ },
+      error: (..._args: unknown[]) => { /* noop */ },
+      verbose: (..._args: unknown[]) => { /* noop */ },
     },
 
     customData: {},
 
     helpers,
+
+    // Internal: read by node-runner.ts after execution.
+    _hints,
   };
 
   return ctx;

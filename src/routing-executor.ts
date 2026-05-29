@@ -8,8 +8,6 @@
  *   https://docs.n8n.io/integrations/creating-nodes/build/declarative-style-node/
  *
  * Limitations compared to the real runtime:
- *  - Only handles type: 'generic' authenticate configs
- *  - Template expressions limited to $parameter.<name> patterns
  *  - No pagination support
  *  - No binary output handling
  */
@@ -17,8 +15,9 @@
 import axios from 'axios';
 import type { IDataObject, INodeExecutionData, INodeProperties, INodeType } from './n8n-types';
 
+import { applyCredentialAuth } from './credential-auth';
 import { normalizeItems, returnJsonArray } from './helpers';
-import type { RunNodeOptions, RunNodeResult } from './types';
+import type { CredentialsMap, CredentialTypeMap, RunNodeOptions, RunNodeResult } from './types';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Template interpolation
@@ -100,12 +99,14 @@ interface RoutingRequest {
   headers: Record<string, string>;
   body: IDataObject;
   qs: IDataObject;
+  auth?: { username?: string; password?: string };
 }
 
 function buildRequest(
   nodeType: INodeType,
   parameters: IDataObject,
-  credentials: IDataObject,
+  credentials: CredentialsMap,
+  credentialTypes: CredentialTypeMap,
 ): RoutingRequest {
   const desc = nodeType.description;
   const defaults = (desc.requestDefaults ?? {}) as IDataObject;
@@ -118,28 +119,21 @@ function buildRequest(
     qs: {},
   };
 
-  // Apply credential authenticate config to request headers/qs/body
+  // Apply credential authenticate config.
+  // In n8n, the `authenticate` field lives on the ICredentialType definition
+  // (credentialTypes map), NOT on the credential reference in the node description.
   if (desc.credentials) {
     for (const credDef of desc.credentials) {
-      const credValues = credentials[credDef.name] as IDataObject | undefined;
-      if (!credValues) continue;
-
-      const credType = (credDef as unknown as IDataObject).authenticate as IDataObject | undefined;
-      if (credType?.type === 'generic') {
-        const props = credType.properties as IDataObject | undefined;
-        if (props?.headers) {
-          const hdrs = interpolateObject(props.headers as IDataObject, credValues);
-          Object.assign(req.headers, hdrs);
-        }
-        if (props?.qs) {
-          const q = interpolateObject(props.qs as IDataObject, credValues);
-          Object.assign(req.qs, q);
-        }
-        if (props?.body) {
-          const b = interpolateObject(props.body as IDataObject, credValues);
-          Object.assign(req.body, b);
-        }
-      }
+      const merged = applyCredentialAuth(
+        { headers: req.headers, qs: req.qs, body: req.body },
+        credDef.name,
+        credentials,
+        credentialTypes,
+      );
+      if (merged.headers) Object.assign(req.headers, merged.headers);
+      if (merged.qs) Object.assign(req.qs, merged.qs as IDataObject);
+      if (merged.body) Object.assign(req.body, merged.body as IDataObject);
+      if (merged.auth) req.auth = merged.auth as { username?: string; password?: string };
     }
   }
 
@@ -200,7 +194,13 @@ export async function runRoutingNode(
   nodeType: INodeType,
   opts: RunNodeOptions,
 ): Promise<RunNodeResult> {
-  const { parameters, credentials = {}, items, httpInterceptor } = opts;
+  const {
+    parameters,
+    credentials = {} as CredentialsMap,
+    credentialTypes = {} as CredentialTypeMap,
+    items,
+    httpInterceptor,
+  } = opts;
 
   const inputItems = items?.length
     ? normalizeItems(items as IDataObject[])
@@ -210,7 +210,7 @@ export async function runRoutingNode(
 
   for (const inputItem of inputItems) {
     const itemParameters = { ...parameters, ...inputItem.json };
-    const req = buildRequest(nodeType, itemParameters, credentials);
+    const req = buildRequest(nodeType, itemParameters, credentials, credentialTypes);
 
     let result: unknown;
 
@@ -228,12 +228,18 @@ export async function runRoutingNode(
     }
 
     if (result === undefined) {
+      const axiosAuth =
+        req.auth?.username !== undefined
+          ? { username: req.auth.username, password: req.auth.password ?? '' }
+          : undefined;
+
       const response = await axios({
         method: req.method,
         url: req.url,
         headers: req.headers,
         data: Object.keys(req.body).length ? req.body : undefined,
         params: Object.keys(req.qs).length ? req.qs : undefined,
+        auth: axiosAuth,
       });
       result = response.data;
     }
@@ -247,5 +253,6 @@ export async function runRoutingNode(
   return {
     items: allOutputItems,
     outputs: [allOutputItems],
+    hints: [],
   };
 }

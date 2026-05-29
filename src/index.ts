@@ -3,8 +3,18 @@ export { runNode, runNodeJson } from './node-runner';
 export { runRoutingNode } from './routing-executor';
 export { createExecuteContext, NotImplementedError } from './execute-context';
 
+// ── Workflow runner ───────────────────────────────────────────────────────────
+export { runWorkflow, runWorkflowFile } from './workflow-runner';
+
+// ── Node validator (nodelinter-style structural checks) ───────────────────────
+export { validateNode } from './validate-node';
+export type { ValidationResult, ValidationIssue, ValidationSeverity } from './validate-node';
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 export { returnJsonArray, constructExecutionMetaData, normalizeItems } from './helpers';
+
+// ── Credential auth (for extending the mock context) ─────────────────────────
+export { applyCredentialAuth } from './credential-auth';
 
 // ── Runtime values (mirrors n8n-workflow exports) ──────────────────────────────
 // Import these instead of n8n-workflow to avoid its Sustainable Use License.
@@ -18,6 +28,11 @@ export type {
   CredentialTypeMap,
   HttpRequestInterceptor,
   JsonItem,
+  WorkflowJson,
+  WorkflowNode,
+  WorkflowConnection,
+  WorkflowRunOptions,
+  WorkflowRunResult,
 } from './types';
 
 // Re-export all n8n interface types so consumers can use them without
@@ -48,6 +63,7 @@ export type {
   IWorkflowSettings,
   IDisplayOptions,
   NodeConnectionType,
+  NodeExecutionHint,
   WorkflowExecuteMode,
   ActivationMode,
   NodePropertyTypes,

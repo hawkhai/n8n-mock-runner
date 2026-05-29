@@ -6,7 +6,7 @@
  * legacy nodes that call this.prepareOutputData().
  */
 
-import type { INodeExecutionData, INodeType, IVersionedNodeType } from './n8n-types';
+import type { INodeExecutionData, INodeType, IVersionedNodeType, NodeExecutionHint } from './n8n-types';
 
 import { createExecuteContext } from './execute-context';
 import { runRoutingNode } from './routing-executor';
@@ -43,23 +43,25 @@ function resolveNodeType(node: INodeType | IVersionedNodeType): INodeType {
  *   },
  * });
  * console.log(result.items);
+ * console.log(result.hints); // any warnings the node emitted
  * ```
  */
 export async function runNode(opts: RunNodeOptions): Promise<RunNodeResult> {
   const nodeType = resolveNodeType(opts.node);
 
-  // ── proof banner ──────────────────────────────────────────────────────────
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { version: runnerVersion } = require('../package.json') as { version: string };
-  const nd = nodeType.description;
-  console.log(
-    `\n[n8n-mock-runner v${runnerVersion}] ` +
-      `node="${nd?.displayName ?? opts.nodeType}" ` +
-      `type="${nd?.name ?? '?'}" ` +
-      `nodeVersion=${nd?.version ?? '?'} ` +
-      `package="${opts.nodeType ?? '?'}"`,
-  );
-  // ─────────────────────────────────────────────────────────────────────────
+  if (!opts.silent) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { version: runnerVersion } = require('../package.json') as { version: string };
+    const nd = nodeType.description;
+    // eslint-disable-next-line no-console
+    console.log(
+      `\n[n8n-mock-runner v${runnerVersion}] ` +
+        `node="${nd?.displayName ?? opts.nodeType}" ` +
+        `type="${nd?.name ?? '?'}" ` +
+        `nodeVersion=${nd?.version ?? '?'} ` +
+        `package="${opts.nodeType ?? '?'}"`,
+    );
+  }
 
   // Declarative (routing-only) nodes — delegate to the routing executor
   if (!nodeType.execute) {
@@ -85,9 +87,13 @@ export async function runNode(opts: RunNodeOptions): Promise<RunNodeResult> {
       : [rawResult as unknown as INodeExecutionData[]]
     : [[]];
 
+  // Collect hints accumulated during execution
+  const hints = ((ctx as Record<string, unknown>)._hints as NodeExecutionHint[]) ?? [];
+
   return {
     items: resolved[0] ?? [],
     outputs: resolved,
+    hints,
   };
 }
 
