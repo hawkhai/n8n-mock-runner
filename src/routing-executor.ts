@@ -20,7 +20,7 @@ import type {
   INodeExecutionData,
   INodeProperties,
   INodeType,
-} from 'n8n-workflow';
+} from './n8n-types';
 
 import { normalizeItems, returnJsonArray } from './helpers';
 import type { RunNodeOptions, RunNodeResult } from './types';
@@ -31,16 +31,15 @@ import type { RunNodeOptions, RunNodeResult } from './types';
 
 /**
  * Interpolate simple `={{ $parameter.xxx }}` and `{{ $parameter.xxx }}` expressions.
- * n8n supports a richer expression engine; this covers the common declarative case.
  */
 function interpolate(value: string, parameters: IDataObject): string {
   return value
     .replace(/=\{\{\s*\$parameter\.(\w[\w.]*)\s*\}\}/g, (_, key) => {
-      const v = getNestedValue(parameters, key);
+      const v = getNestedValue(parameters, key as string);
       return v !== undefined ? String(v) : '';
     })
     .replace(/\{\{\s*\$parameter\.(\w[\w.]*)\s*\}\}/g, (_, key) => {
-      const v = getNestedValue(parameters, key);
+      const v = getNestedValue(parameters, key as string);
       return v !== undefined ? String(v) : '';
     });
 }
@@ -178,7 +177,7 @@ function buildRequest(
 
     // routing.send — map parameter values into the request
     if (routing.send) {
-      const send = routing.send as IDataObject;
+      const send = routing.send as unknown as IDataObject;
       const paramValue = getNestedValue(parameters, prop.name);
       if (paramValue === undefined || paramValue === null || paramValue === '') continue;
 
@@ -249,7 +248,6 @@ export async function runRoutingNode(
       result = response.data;
     }
 
-    // Normalise result to INodeExecutionData[]
     const outputItems = returnJsonArray(
       Array.isArray(result) ? (result as IDataObject[]) : [result as IDataObject],
     );

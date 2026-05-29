@@ -12,7 +12,7 @@
 
 import axios from 'axios';
 import get from 'lodash/get';
-import type { IDataObject, INodeExecutionData } from 'n8n-workflow';
+import type { IDataObject, INodeExecutionData } from './n8n-types';
 
 import { constructExecutionMetaData, normalizeItems, returnJsonArray } from './helpers';
 import type { CredentialsMap, CredentialTypeMap, HttpRequestInterceptor, RunNodeOptions } from './types';
@@ -104,43 +104,37 @@ function applyCredentialAuth(
 
   const merged: IDataObject = { ...requestOptions };
 
-  // Apply headers
+  const interpolate = (tpl: string) =>
+    tpl.replace(
+      /\{\{[\s]*\$credentials\.(\w+)[\s]*\}\}/g,
+      (_, field: string) => String(credValues[field] ?? ''),
+    );
+
   if (props.headers) {
-    const existingHeaders = (merged.headers as Record<string, string>) ?? {};
-    const authHeaders: Record<string, string> = {};
+    const existing = (merged.headers as Record<string, string>) ?? {};
+    const authHdrs: Record<string, string> = {};
     for (const [key, tpl] of Object.entries(props.headers as Record<string, string>)) {
-      authHeaders[key] = String(tpl).replace(
-        /\{\{[\s]*\$credentials\.(\w+)[\s]*\}\}/g,
-        (_, field: string) => String(credValues[field] ?? ''),
-      );
+      authHdrs[key] = interpolate(tpl);
     }
-    merged.headers = { ...existingHeaders, ...authHeaders };
+    merged.headers = { ...existing, ...authHdrs };
   }
 
-  // Apply query-string params
   if (props.qs) {
-    const existingQs = (merged.qs as IDataObject) ?? {};
+    const existing = (merged.qs as IDataObject) ?? {};
     const authQs: IDataObject = {};
     for (const [key, tpl] of Object.entries(props.qs as Record<string, string>)) {
-      authQs[key] = String(tpl).replace(
-        /\{\{[\s]*\$credentials\.(\w+)[\s]*\}\}/g,
-        (_, field: string) => String(credValues[field] ?? ''),
-      );
+      authQs[key] = interpolate(tpl);
     }
-    merged.qs = { ...existingQs, ...authQs };
+    merged.qs = { ...existing, ...authQs };
   }
 
-  // Apply body fields
   if (props.body) {
-    const existingBody = (merged.body as IDataObject) ?? {};
+    const existing = (merged.body as IDataObject) ?? {};
     const authBody: IDataObject = {};
     for (const [key, tpl] of Object.entries(props.body as Record<string, string>)) {
-      authBody[key] = String(tpl).replace(
-        /\{\{[\s]*\$credentials\.(\w+)[\s]*\}\}/g,
-        (_, field: string) => String(credValues[field] ?? ''),
-      );
+      authBody[key] = interpolate(tpl);
     }
-    merged.body = { ...existingBody, ...authBody };
+    merged.body = { ...existing, ...authBody };
   }
 
   return merged;
@@ -175,11 +169,14 @@ export function createExecuteContext(opts: RunNodeOptions) {
     returnJsonArray,
     constructExecutionMetaData,
     normalizeItems,
-    createDeferredPromise: () => {
-      let resolve: (value: unknown) => void;
-      let reject: (reason?: unknown) => void;
-      const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
-      return { promise, resolve: resolve!, reject: reject! };
+    createDeferredPromise: <T = unknown>() => {
+      let resolve!: (value: T) => void;
+      let reject!: (reason?: unknown) => void;
+      const promise = new Promise<T>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
     },
 
     // ---- HTTP helpers (modern n8n API) ----
@@ -233,7 +230,9 @@ export function createExecuteContext(opts: RunNodeOptions) {
     },
 
     // ---- other stubs ----
-    getSSHTunnelFunctions: () => { throw new NotImplementedError('helpers.getSSHTunnelFunctions'); },
+    getSSHTunnelFunctions: () => {
+      throw new NotImplementedError('helpers.getSSHTunnelFunctions');
+    },
   };
 
   // ── main context object ────────────────────────────────────────────────────
@@ -285,7 +284,6 @@ export function createExecuteContext(opts: RunNodeOptions) {
     // ---- credentials ----
     async getCredentials(type: string) {
       if (credentials[type]) return credentials[type];
-      // Return empty object instead of throwing — some nodes check existence
       return {};
     },
 
@@ -348,10 +346,6 @@ export function createExecuteContext(opts: RunNodeOptions) {
     getNodeOutputs() { return [{ type: 'main', index: 0 }]; },
 
     // ---- legacy compat (n8n-workflow < 1.0) ----
-    /**
-     * `prepareOutputData` was available in old n8n versions.
-     * Newer nodes return INodeExecutionData[][] directly; old nodes call this.
-     */
     async prepareOutputData(outputData: INodeExecutionData[]) {
       return [outputData];
     },

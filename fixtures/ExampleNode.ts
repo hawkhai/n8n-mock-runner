@@ -4,7 +4,8 @@
  * A minimal imperative n8n node adapted from the official n8n-nodes-starter
  * (https://github.com/n8n-io/n8n-nodes-starter/blob/master/nodes/Example/Example.node.ts).
  *
- * Used as the regression target for runNode() tests.
+ * Uses only n8n-mock-runner's own type definitions and runtime values — no
+ * dependency on n8n-workflow.
  */
 
 import type {
@@ -12,8 +13,9 @@ import type {
   INodeExecutionData,
   INodeType,
   INodeTypeDescription,
-} from 'n8n-workflow';
-import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
+} from '../src/n8n-types';
+
+import { NodeConnectionTypes, NodeOperationError } from '../src/n8n-runtime';
 
 export class ExampleNode implements INodeType {
   description: INodeTypeDescription = {
@@ -47,10 +49,11 @@ export class ExampleNode implements INodeType {
         items[i].json.myString = myString;
       } catch (error) {
         if (this.continueOnFail()) {
-          items.push({ json: this.getInputData(i)[0].json, error, pairedItem: i });
+          items.push({ json: this.getInputData(i)[0].json, error: error as Error, pairedItem: i });
         } else {
-          if ((error as { context?: { itemIndex?: number } }).context) {
-            (error as { context: { itemIndex: number } }).context.itemIndex = i;
+          const err = error as { context?: { itemIndex?: number } };
+          if (err.context) {
+            err.context.itemIndex = i;
             throw error;
           }
           throw new NodeOperationError(this.getNode(), error as Error, { itemIndex: i });

@@ -1,4 +1,4 @@
-import type { IDataObject, INodeExecutionData, IPairedItemData } from 'n8n-workflow';
+import type { IDataObject, INodeExecutionData, IPairedItemData } from './n8n-types';
 
 /**
  * Wraps raw JSON data into the INodeExecutionData[] format n8n uses.

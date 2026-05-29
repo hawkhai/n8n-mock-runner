@@ -1,4 +1,11 @@
-import type { IDataObject, INodeExecutionData, INodeType, IVersionedNodeType } from 'n8n-workflow';
+import type {
+  IDataObject,
+  INodeExecutionData,
+  INodeType,
+  IVersionedNodeType,
+} from './n8n-types';
+
+export type { IDataObject, INodeExecutionData, INodeType, IVersionedNodeType };
 
 /** One input/output item */
 export type JsonItem = Record<string, unknown>;
