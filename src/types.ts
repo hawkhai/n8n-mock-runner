@@ -6,6 +6,29 @@ export type JsonItem = Record<string, unknown>;
 /** Credentials map: { credentialTypeName: { field: value } } */
 export type CredentialsMap = Record<string, IDataObject>;
 
+/**
+ * Credential type definitions map, keyed by credential type name.
+ *
+ * Used to simulate n8n's IAuthenticateGeneric behaviour when calling
+ * `httpRequestWithAuthentication`. Each entry mirrors a credential type's
+ * `authenticate` field.
+ *
+ * @example
+ * ```typescript
+ * {
+ *   myApiCredentials: {
+ *     authenticate: {
+ *       type: 'generic',
+ *       properties: {
+ *         headers: { Authorization: 'Bearer {{$credentials.apiKey}}' },
+ *       },
+ *     },
+ *   },
+ * }
+ * ```
+ */
+export type CredentialTypeMap = Record<string, IDataObject>;
+
 /** HTTP request interceptor — return a value to short-circuit the real request */
 export type HttpRequestInterceptor = (
   options: IDataObject,
@@ -43,6 +66,16 @@ export interface RunNodeOptions {
    * Example: `{ myApiCredentials: { apiKey: 'xxx' } }`
    */
   credentials?: CredentialsMap;
+
+  /**
+   * Optional credential type definitions for simulating IAuthenticateGeneric.
+   * When provided, `httpRequestWithAuthentication` will apply the `authenticate`
+   * config (headers / qs / body template substitution) before making the request.
+   *
+   * Keys are credential type names; values mirror the credential type's
+   * `authenticate` property from its ICredentialType definition.
+   */
+  credentialTypes?: CredentialTypeMap;
 
   /**
    * Whether to continue execution when a single item fails (continueOnFail).

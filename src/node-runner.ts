@@ -6,14 +6,10 @@
  * legacy nodes that call this.prepareOutputData().
  */
 
-import type {
-  INodeExecutionData,
-  INodeType,
-  IVersionedNodeType,
-  NodeHelpers,
-} from 'n8n-workflow';
+import type { INodeExecutionData, INodeType, IVersionedNodeType } from 'n8n-workflow';
 
 import { createExecuteContext } from './execute-context';
+import { runRoutingNode } from './routing-executor';
 import type { RunNodeOptions, RunNodeResult } from './types';
 
 /**
@@ -53,7 +49,7 @@ export async function runNode(opts: RunNodeOptions): Promise<RunNodeResult> {
   const nodeType = resolveNodeType(opts.node);
 
   // ── proof banner ──────────────────────────────────────────────────────────
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { version: runnerVersion } = require('../package.json') as { version: string };
   const nd = nodeType.description;
   console.log(
@@ -65,32 +61,35 @@ export async function runNode(opts: RunNodeOptions): Promise<RunNodeResult> {
   );
   // ─────────────────────────────────────────────────────────────────────────
 
+  // Declarative (routing-only) nodes — delegate to the routing executor
   if (!nodeType.execute) {
+    if (nodeType.description?.properties?.some((p) => p.routing)) {
+      return runRoutingNode(nodeType, opts);
+    }
     throw new Error(
-      `Node "${opts.nodeType ?? 'unknown'}" does not have an execute() method. ` +
-        'Trigger / webhook nodes are not supported by runNode(); use the trigger/webhook runners instead.',
+      `Node "${opts.nodeType ?? 'unknown'}" has no execute() method and no routing config. ` +
+        'Trigger/webhook nodes are not supported. For declarative nodes, ensure routing ' +
+        'properties are defined on the node description.',
     );
   }
 
   const ctx = createExecuteContext(opts);
 
-  let rawResult: INodeExecutionData[][] | undefined;
-
   // Support both modern (return value) and legacy (prepareOutputData) patterns
-  rawResult = (await nodeType.execute.call(ctx as any)) as INodeExecutionData[][] | undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rawResult = (await nodeType.execute.call(ctx as any)) as
+    | INodeExecutionData[][]
+    | undefined;
 
-  // Some old nodes return void and rely on prepareOutputData
-  if (!rawResult) {
-    rawResult = [[]];
-  }
-
-  const outputs: INodeExecutionData[][] = Array.isArray(rawResult[0])
-    ? (rawResult as INodeExecutionData[][])
-    : [rawResult as unknown as INodeExecutionData[]];
+  const resolved: INodeExecutionData[][] = rawResult
+    ? Array.isArray(rawResult[0])
+      ? (rawResult as INodeExecutionData[][])
+      : [rawResult as unknown as INodeExecutionData[]]
+    : [[]];
 
   return {
-    items: outputs[0] ?? [],
-    outputs,
+    items: resolved[0] ?? [],
+    outputs: resolved,
   };
 }
 

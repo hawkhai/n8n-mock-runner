@@ -1,228 +1,275 @@
 # n8n-mock-runner
 
-Run n8n community nodes **without the n8n runtime**.  
-Drop it into any Node.js project and execute n8n nodes programmatically.
+**Standalone n8n node runner** — execute [n8n](https://n8n.io) community nodes locally without starting the n8n server.
+
+> Designed as a companion to [n8n-nodes-starter](https://github.com/n8n-io/n8n-nodes-starter):
+> build your node with the official scaffold, then test it with mock-runner in seconds.
 
 ---
 
-## 原理
+## Why?
 
-n8n 节点的 `execute()` 方法通过 `this` 访问运行时上下文（`IExecuteFunctions`）。  
-本库提供一个该接口的完整 Mock 实现，覆盖社区节点实际调用的所有常用方法，
-从而让 `node.execute.call(mockContext)` 能正确运行，无需启动 n8n 服务。
-
-### Mock 实现来源
-
-| 方法/函数 | 参考来源 |
-|---|---|
-| `returnJsonArray` | `n8n/packages/core/src/execution-engine/node-execution-context/utils/return-json-array.ts` |
-| `constructExecutionMetaData` | `n8n/packages/core/src/execution-engine/node-execution-context/utils/construct-execution-metadata.ts` |
-| `createExecuteContext` 结构 | `n8n/packages/core/src/execution-engine/node-execution-context/execute-context.ts` |
-| `createMockExecuteFunction` 模式 | `n8n/packages/nodes-base/test/nodes/Helpers.ts` |
+| Scenario | n8n dev server | n8n-mock-runner |
+|---|---|---|
+| Full UI / workflow testing | ✅ | ❌ |
+| Fast scripted / unit tests | ❌ | ✅ |
+| CI pipeline without Docker | ❌ | ✅ |
+| HTTP mock / interceptors | ❌ | ✅ |
+| Zero-config credentials | ❌ | ✅ |
 
 ---
 
-## 安装
+## Prerequisites
+
+- Node.js **≥ 18**
+- `n8n-workflow` peer dependency (already installed if you have n8n)
+
+---
+
+## Installation
 
 ```bash
-# 在你的项目中安装
-npm install n8n-workflow axios lodash
-# 然后将本项目复制到你的项目下，或直接引用
+npm install n8n-mock-runner
+# peer dependency (if not already present)
+npm install n8n-workflow
 ```
 
 ---
 
-## 快速开始
+## Quick Start
 
 ```typescript
-import { runNode, runNodeJson } from './n8n-mock-runner/src';
-import { Sqlite } from 'n8n-nodes-sqlite/dist/nodes/SQLite/Sqlite.node';
+import { runNode, runNodeJson } from 'n8n-mock-runner';
+import { Sqlite } from 'n8n-nodes-sqlite';
 
-// 执行查询
-const rows = await runNodeJson({
+// 1. Run a node — returns { items, outputs }
+const result = await runNode({
   node: new Sqlite(),
   nodeType: 'n8n-nodes-sqlite.sqlite',
   parameters: {
-    database: './mydb.db',
+    database: './my.db',
     operation: 'executeQuery',
     query: 'SELECT * FROM users',
   },
 });
-console.log(rows); // [{ id: 1, name: 'Alice', age: 30 }, ...]
+
+console.log(result.items);   // INodeExecutionData[]
+console.log(result.outputs); // INodeExecutionData[][]
+
+// 2. Convenience: return plain JSON objects
+const rows = await runNodeJson({
+  node: new Sqlite(),
+  parameters: { database: './my.db', operation: 'executeQuery', query: 'SELECT * FROM users' },
+});
+// rows = [{ id: 1, name: 'Alice' }, ...]
 ```
 
 ---
 
 ## API
 
-### `runNode(opts): Promise<RunNodeResult>`
+### `runNode(opts: RunNodeOptions): Promise<RunNodeResult>`
 
-执行一个 n8n 节点，返回完整的 `{ items, outputs }` 结构。
+Executes a node (imperative **or** declarative/routing style) and returns all output data.
 
-### `runNodeJson(opts): Promise<Record<string, unknown>[]>`
+### `runNodeJson(opts: RunNodeOptions): Promise<Record<string, unknown>[]>`
 
-执行节点并直接返回 JSON 数组（省去 `.items.map(i => i.json)` 步骤）。
+Convenience wrapper — runs the node and returns only `items[n].json` from output 0.
 
-### `createExecuteContext(opts)`
+### `runRoutingNode(nodeType, opts): Promise<RunNodeResult>`
 
-创建原始 Mock 上下文对象，方便进一步扩展。
-
----
-
-## RunNodeOptions
-
-```typescript
-interface RunNodeOptions {
-  /** 节点实例，如 new Sqlite() */
-  node: INodeType | IVersionedNodeType;
-
-  /** 节点类型字符串，如 "n8n-nodes-sqlite.sqlite" */
-  nodeType?: string;
-
-  /** 节点参数（对应 n8n UI 中的配置项） */
-  parameters: Record<string, unknown>;
-
-  /** 输入数据，支持 [{ json: {...} }] 或 [{...}] 两种格式，默认 [{ json: {} }] */
-  items?: Array<{ json: object }> | object[];
-
-  /** 凭证，格式 { credentialTypeName: { field: value } } */
-  credentials?: Record<string, object>;
-
-  /** 是否在单条失败时继续，默认 false */
-  continueOnFail?: boolean;
-
-  /** HTTP 拦截器，返回值替代真实 HTTP 请求 */
-  httpInterceptor?: (options: object) => Promise<unknown> | unknown | undefined;
-
-  /** 时区，默认 "UTC" */
-  timezone?: string;
-}
-```
+Low-level entry for declarative (routing-only) nodes. Called automatically by `runNode()` when a node has no `execute()` method but has `routing` properties.
 
 ---
 
-## HTTP 节点示例
+## `RunNodeOptions`
 
-对于会发出 HTTP 请求的节点（如 HTTP Request、Slack、GitHub 等），
-可通过 `httpInterceptor` 拦截请求，或直接让它打到真实 API：
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `node` | `INodeType \| IVersionedNodeType` | *required* | Node instance |
+| `nodeType` | `string` | `'n8n-mock-runner.mockNode'` | n8n type string (cosmetic) |
+| `parameters` | `IDataObject` | *required* | Node parameter values |
+| `items` | `Array<{json} \| object>` | `[{json:{}}]` | Input items |
+| `credentials` | `CredentialsMap` | `{}` | Credential values by type name |
+| `credentialTypes` | `CredentialTypeMap` | `{}` | Credential type defs (for auth injection) |
+| `continueOnFail` | `boolean` | `false` | Mirror of node's continueOnFail setting |
+| `httpInterceptor` | `HttpRequestInterceptor` | `undefined` | Intercept / mock HTTP calls |
+| `timezone` | `string` | `'UTC'` | Workflow timezone |
+| `mode` | `string` | `'manual'` | Execution mode |
+
+---
+
+## Credential Authentication (`IAuthenticateGeneric`)
+
+Pass `credentialTypes` to simulate how n8n applies credential authentication before HTTP calls.
+The template syntax `{{$credentials.field}}` is resolved automatically.
 
 ```typescript
-import { HttpRequest } from 'n8n-nodes-base/dist/nodes/HttpRequest/HttpRequest.node';
-
-// 拦截 HTTP 请求（用于测试）
-const result = await runNodeJson({
-  node: new HttpRequest(),
-  parameters: {
-    method: 'GET',
-    url: 'https://api.example.com/users',
-  },
-  httpInterceptor: async (opts) => {
-    // 返回 mock 数据
-    return [{ id: 1, name: 'Alice' }];
-  },
-});
-
-// 直接调用真实 API（不传 httpInterceptor）
-const realResult = await runNodeJson({
-  node: new HttpRequest(),
-  parameters: {
-    method: 'GET',
-    url: 'https://jsonplaceholder.typicode.com/users',
-  },
+await runNode({
+  node: new MyApiNode(),
+  parameters: { resource: 'user', operation: 'get' },
   credentials: {
-    httpHeaderAuth: { name: 'Authorization', value: 'Bearer mytoken' }
+    myApiCredentials: { apiKey: 'sk-live-abc123' },
+  },
+  credentialTypes: {
+    myApiCredentials: {
+      authenticate: {
+        type: 'generic',
+        properties: {
+          headers: { Authorization: 'Bearer {{$credentials.apiKey}}' },
+        },
+      },
+    },
+  },
+});
+// → Authorization: Bearer sk-live-abc123 is added to every HTTP request
+```
+
+---
+
+## HTTP Interceptor (Mock External APIs)
+
+```typescript
+const result = await runNode({
+  node: new GithubNode(),
+  parameters: { operation: 'getUser', username: 'octocat' },
+  credentials: { githubApi: { accessToken: 'test-token' } },
+  httpInterceptor: async (options) => {
+    if (String(options.url).includes('/users/')) {
+      return { login: 'octocat', name: 'The Octocat' };
+    }
+    // return undefined to fall through to real axios
   },
 });
 ```
 
 ---
 
-## 带凭证的节点示例
+## Declarative (Routing) Node Support
+
+Nodes built with the [declarative style](https://docs.n8n.io/integrations/creating-nodes/build/declarative-style-node/)
+(no `execute()` method, only `routing` on properties) are automatically detected and executed
+by the built-in routing executor.
+
+Supported routing features:
+
+| Feature | Support |
+|---|---|
+| `routing.request` (method, url, baseURL, headers, body, qs) | ✅ |
+| `routing.send` (body / query / header) | ✅ |
+| `displayOptions` (show / hide) | ✅ |
+| `requestDefaults` (baseURL, headers) | ✅ |
+| `IAuthenticateGeneric` credential injection | ✅ |
+| Template expressions `{{ $parameter.xxx }}` | ✅ |
+| Pagination | ❌ |
+| Binary output | ❌ |
+
+---
+
+## Node Compatibility
+
+| Node style | Support |
+|---|---|
+| Imperative (`execute()` method) | ✅ Full |
+| Declarative (`routing` properties) | ✅ Basic |
+| Versioned (`IVersionedNodeType`) | ✅ Picks latest version |
+| Trigger / webhook | ❌ |
+| Sub-workflow (`executeWorkflow`) | ❌ (throws `NotImplementedError`) |
+| SSH tunnel | ❌ (throws `NotImplementedError`) |
+| Binary data (complex) | ⚠️ Partial stub |
+
+---
+
+## Testing Your Own Node
 
 ```typescript
-import { Slack } from 'n8n-nodes-base/dist/nodes/Slack/Slack.node';
+// my-node.test.ts (Vitest / Jest)
+import { describe, it, expect, vi } from 'vitest';
+import { runNode } from 'n8n-mock-runner';
+import { MyNode } from './nodes/MyNode';
 
-const result = await runNodeJson({
-  node: new Slack(),
-  nodeType: 'n8n-nodes-base.slack',
-  parameters: {
-    resource: 'message',
-    operation: 'post',
-    channel: '#general',
-    text: 'Hello from mock runner!',
-  },
-  credentials: {
-    slackApi: { accessToken: 'xoxb-your-token-here' }
-  },
+describe('MyNode', () => {
+  it('creates a record', async () => {
+    const result = await runNode({
+      node: new MyNode(),
+      parameters: { resource: 'record', operation: 'create', title: 'Test' },
+      credentials: { myApi: { baseUrl: 'https://api.example.com', apiKey: 'test' } },
+      httpInterceptor: vi.fn().mockResolvedValue({ id: 42, title: 'Test' }),
+    });
+
+    expect(result.items[0].json.id).toBe(42);
+  });
 });
 ```
 
 ---
 
-## 多条输入数据
+## Scripts
 
-```typescript
-const result = await runNodeJson({
-  node: new Transform(),
-  parameters: { operation: 'toUpperCase', field: 'name' },
-  items: [
-    { json: { name: 'alice' } },
-    { json: { name: 'bob' } },
-  ],
-  // 或使用简写：
-  // items: [{ name: 'alice' }, { name: 'bob' }],
-});
-```
-
----
-
-## 扩展 Mock 上下文
-
-如果你的节点使用了 `NotImplementedError` 的方法，可以扩展上下文：
-
-```typescript
-import { createExecuteContext } from './n8n-mock-runner/src';
-
-const ctx = createExecuteContext({ node: myNode, parameters: {} });
-
-// 覆盖特定方法
-(ctx as any).helpers.getBinaryDataBuffer = async (itemIndex: number, propertyName: string) => {
-  return Buffer.from('your binary data');
-};
-
-// 手动执行
-const result = await (myNode as any).execute.call(ctx);
-```
+| Script | Description |
+|---|---|
+| `npm run build` | Compile TypeScript to `dist/` |
+| `npm run build:watch` | Watch mode |
+| `npm test` | Run test suite (Vitest) |
+| `npm run test:watch` | Watch mode tests |
+| `npm run test:coverage` | Tests + coverage report |
+| `npm run lint` | ESLint check |
+| `npm run lint:fix` | ESLint auto-fix |
+| `npm run format` | Prettier format |
+| `npm run format:check` | Prettier dry-run |
+| `npm run example:sqlite` | Run the SQLite demo |
 
 ---
 
-## 注意事项
-
-| 功能 | 支持情况 |
-|------|---------|
-| `execute()` 节点 | ✅ 完全支持 |
-| HTTP 请求（axios）| ✅ 支持，可拦截 |
-| 凭证注入 | ✅ 支持 |
-| 多输入多输出 | ✅ 支持 |
-| Trigger / Webhook 节点 | ❌ 暂不支持 |
-| AI/LangChain 节点 | ⚠️ 基础支持，部分功能需扩展 |
-| SSH Tunnel | ❌ 抛出 NotImplementedError |
-| Binary Data（文件）| ⚠️ prepareBinaryData 支持，getBinaryDataBuffer 需手动扩展 |
-
----
-
-## 目录结构
+## Project Structure
 
 ```
 n8n-mock-runner/
 ├── src/
-│   ├── index.ts              # 公开 API
-│   ├── execute-context.ts    # IExecuteFunctions Mock 实现
-│   ├── helpers.ts            # returnJsonArray / constructExecutionMetaData
-│   ├── node-runner.ts        # runNode / runNodeJson
-│   └── types.ts              # 类型定义
+│   ├── index.ts              Public API exports
+│   ├── node-runner.ts        runNode / runNodeJson entry points
+│   ├── execute-context.ts    IExecuteFunctions mock (createExecuteContext)
+│   ├── routing-executor.ts   Declarative node routing engine
+│   ├── helpers.ts            returnJsonArray / constructExecutionMetaData
+│   └── types.ts              RunNodeOptions, RunNodeResult, etc.
+├── fixtures/
+│   ├── ExampleNode.ts        Imperative node fixture (from n8n-nodes-starter)
+│   └── EchoNode.ts           Declarative routing node fixture
+├── tests/
+│   └── run-node.test.ts      Vitest test suite
 ├── examples/
-│   └── sqlite-demo.ts        # SQLite 节点演示
-├── package.json
-└── tsconfig.json
+│   └── sqlite-demo.ts        Full SQLite integration demo
+├── .github/
+│   ├── workflows/ci.yml      GitHub Actions CI
+│   └── dependabot.yml        Automated dependency updates
+└── .vscode/
+    ├── launch.json           Debug configurations
+    └── extensions.json       Recommended extensions
 ```
+
+---
+
+## Relationship to n8n-nodes-starter
+
+```
+┌─────────────────────────────────┐     ┌─────────────────────────────────┐
+│      n8n-nodes-starter          │     │       n8n-mock-runner           │
+│                                 │     │                                 │
+│  • Official node template       │     │  • Standalone test runner       │
+│  • n8n-node CLI toolchain       │ ──► │  • No n8n server needed         │
+│  • npm run dev (full UI)        │     │  • Fast scripted / unit tests   │
+│  • lint / build / release       │     │  • HTTP interceptors / mocks    │
+└─────────────────────────────────┘     └─────────────────────────────────┘
+        Use for authoring                     Use for testing
+```
+
+**Workflow:**
+1. Scaffold your node with `n8n-nodes-starter`
+2. Develop and preview in the n8n UI (`npm run dev`)
+3. Write fast automated tests with `n8n-mock-runner` in CI
+
+---
+
+## License
+
+MIT

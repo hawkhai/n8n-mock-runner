@@ -12,17 +12,10 @@
 
 import axios from 'axios';
 import get from 'lodash/get';
-import type {
-  IDataObject,
-  INodeExecutionData,
-} from 'n8n-workflow';
+import type { IDataObject, INodeExecutionData } from 'n8n-workflow';
 
-import {
-  constructExecutionMetaData,
-  normalizeItems,
-  returnJsonArray,
-} from './helpers';
-import type { CredentialsMap, HttpRequestInterceptor, RunNodeOptions } from './types';
+import { constructExecutionMetaData, normalizeItems, returnJsonArray } from './helpers';
+import type { CredentialsMap, CredentialTypeMap, HttpRequestInterceptor, RunNodeOptions } from './types';
 
 export class NotImplementedError extends Error {
   constructor(methodName: string) {
@@ -88,6 +81,71 @@ async function doHttpRequest(
   return response.data;
 }
 
+/**
+ * Apply IAuthenticateGeneric-style credential config to request options.
+ * This mirrors what the real n8n runtime does before executing authenticated requests.
+ */
+function applyCredentialAuth(
+  requestOptions: IDataObject,
+  credentialType: string,
+  credentials: CredentialsMap,
+  credentialTypes: CredentialTypeMap,
+): IDataObject {
+  const credValues = credentials[credentialType] as IDataObject | undefined;
+  const credTypeDef = credentialTypes[credentialType] as IDataObject | undefined;
+
+  if (!credValues || !credTypeDef) return requestOptions;
+
+  const authenticate = credTypeDef.authenticate as IDataObject | undefined;
+  if (!authenticate || authenticate.type !== 'generic') return requestOptions;
+
+  const props = authenticate.properties as IDataObject | undefined;
+  if (!props) return requestOptions;
+
+  const merged: IDataObject = { ...requestOptions };
+
+  // Apply headers
+  if (props.headers) {
+    const existingHeaders = (merged.headers as Record<string, string>) ?? {};
+    const authHeaders: Record<string, string> = {};
+    for (const [key, tpl] of Object.entries(props.headers as Record<string, string>)) {
+      authHeaders[key] = String(tpl).replace(
+        /\{\{[\s]*\$credentials\.(\w+)[\s]*\}\}/g,
+        (_, field: string) => String(credValues[field] ?? ''),
+      );
+    }
+    merged.headers = { ...existingHeaders, ...authHeaders };
+  }
+
+  // Apply query-string params
+  if (props.qs) {
+    const existingQs = (merged.qs as IDataObject) ?? {};
+    const authQs: IDataObject = {};
+    for (const [key, tpl] of Object.entries(props.qs as Record<string, string>)) {
+      authQs[key] = String(tpl).replace(
+        /\{\{[\s]*\$credentials\.(\w+)[\s]*\}\}/g,
+        (_, field: string) => String(credValues[field] ?? ''),
+      );
+    }
+    merged.qs = { ...existingQs, ...authQs };
+  }
+
+  // Apply body fields
+  if (props.body) {
+    const existingBody = (merged.body as IDataObject) ?? {};
+    const authBody: IDataObject = {};
+    for (const [key, tpl] of Object.entries(props.body as Record<string, string>)) {
+      authBody[key] = String(tpl).replace(
+        /\{\{[\s]*\$credentials\.(\w+)[\s]*\}\}/g,
+        (_, field: string) => String(credValues[field] ?? ''),
+      );
+    }
+    merged.body = { ...existingBody, ...authBody };
+  }
+
+  return merged;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MockExecuteContext factory
 // ─────────────────────────────────────────────────────────────────────────────
@@ -100,6 +158,7 @@ export function createExecuteContext(opts: RunNodeOptions) {
   const {
     parameters,
     credentials = {} as CredentialsMap,
+    credentialTypes = {} as CredentialTypeMap,
     continueOnFail: continueOnFailFlag = false,
     httpInterceptor,
     timezone = 'UTC',
@@ -136,14 +195,20 @@ export function createExecuteContext(opts: RunNodeOptions) {
     },
 
     requestWithAuthentication: async (
-      _credentialType: string,
+      credentialType: string,
       requestOptions: IDataObject,
-    ) => doHttpRequest(requestOptions, httpInterceptor),
+    ) => {
+      const withAuth = applyCredentialAuth(requestOptions, credentialType, credentials, credentialTypes);
+      return doHttpRequest(withAuth, httpInterceptor);
+    },
 
     httpRequestWithAuthentication: async (
-      _credentialType: string,
+      credentialType: string,
       requestOptions: IDataObject,
-    ) => doHttpRequest(requestOptions, httpInterceptor),
+    ) => {
+      const withAuth = applyCredentialAuth(requestOptions, credentialType, credentials, credentialTypes);
+      return doHttpRequest(withAuth, httpInterceptor);
+    },
 
     // ---- binary helpers (stubs; override via subclass if needed) ----
     prepareBinaryData: async (data: Buffer, filename?: string, mimeType?: string) => ({
