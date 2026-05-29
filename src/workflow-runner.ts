@@ -16,6 +16,8 @@
  *  - No pagination
  */
 
+import { readFileSync } from 'fs';
+
 import type {
   IDataObject,
   INodeExecutionData,
@@ -153,11 +155,9 @@ function evalWorkflowExpression(
     $node[name] = { json: firstItem, data: firstItem };
   }
 
-  // eslint-disable-next-line node/no-process-env
   const $env = process.env as unknown as IDataObject;
 
   try {
-    // eslint-disable-next-line no-new-func
     const fn = new Function(
       '$json',
       '$parameter',
@@ -180,7 +180,7 @@ function evalWorkflowExpression(
       $env,
       // $evaluateExpression — nested evaluation (limited support)
       (expr: string) =>
-        evalWorkflowExpression(`=\{\{${expr}\}\}`, currentJson, parameters, nodeResults),
+        evalWorkflowExpression(`={{${expr}}}`, currentJson, parameters, nodeResults),
     );
   } catch {
     return expression;
@@ -384,8 +384,6 @@ export async function runWorkflowFile(
   filePath: string,
   opts: WorkflowRunOptions,
 ): Promise<WorkflowRunResult> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const fs = require('fs') as typeof import('fs');
-  const json = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as WorkflowJson;
+  const json = JSON.parse(readFileSync(filePath, 'utf-8')) as WorkflowJson;
   return runWorkflow(json, opts);
 }

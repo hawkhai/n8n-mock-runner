@@ -90,13 +90,11 @@ function evalExpression(
   const currentItem = inputItems[Math.min(itemIndex, Math.max(0, inputItems.length - 1))];
   const $json = currentItem?.json ?? {};
   const $parameter = parameters;
-  // eslint-disable-next-line node/no-process-env
   const $env = process.env as unknown as IDataObject;
 
   try {
     // new Function is intentional here: this is a test-time expression evaluator,
     // not production code exposed to untrusted input.
-    // eslint-disable-next-line no-new-func
     const fn = new Function('$json', '$parameter', '$env', `"use strict"; return (${code});`) as (
       $json: IDataObject,
       $parameter: IDataObject,
@@ -358,7 +356,6 @@ export function createExecuteContext(opts: RunNodeOptions) {
       return {
         $json: item?.json ?? {},
         $parameter: parameters,
-        // eslint-disable-next-line node/no-process-env
         $env: process.env,
         $item: (index: number) => ({ $json: inputItems[index]?.json ?? {} }),
       };
@@ -383,10 +380,8 @@ export function createExecuteContext(opts: RunNodeOptions) {
     logNodeOutput(...args: unknown[]): void {
       if (mode === 'manual') {
         // In production this sends structured data to the UI; in tests log to console.
-        // eslint-disable-next-line no-console
         console.log('[node output]', ...args);
       } else if (process.env.CODE_ENABLE_STDOUT === 'true') {
-        // eslint-disable-next-line no-console
         console.log(`[Workflow "mock-workflow"][Node "${fakeNode.name}"]`, ...args);
       }
     },

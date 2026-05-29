@@ -58,7 +58,6 @@ export async function runNode(opts: RunNodeOptions): Promise<RunNodeResult> {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { version: runnerVersion } = require('../package.json') as { version: string };
     const nd = nodeType.description;
-    // eslint-disable-next-line no-console
     console.log(
       `\n[n8n-mock-runner v${runnerVersion}] ` +
         `node="${nd?.displayName ?? opts.nodeType}" ` +
