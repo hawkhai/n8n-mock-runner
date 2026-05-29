@@ -12,6 +12,7 @@
  */
 
 import path from 'path';
+import { unlinkSync, existsSync } from 'fs';
 
 // ── Adjust this path if you installed n8n-nodes-sqlite differently ────────────
 // Option A: local sibling project
@@ -38,7 +39,13 @@ const DB = path.resolve(__dirname, 'demo.db');
 async function main() {
   console.log('--- n8n-nodes-sqlite standalone demo ---\n');
 
-  // ① Create table
+  // ① Clean up previous run
+  if (existsSync(DB)) {
+    unlinkSync(DB);
+    console.log('✓ Previous demo.db removed');
+  }
+
+  // ② Create table
   await runNode({
     node: new Sqlite(),
     nodeType: 'n8n-nodes-sqlite.sqlite',

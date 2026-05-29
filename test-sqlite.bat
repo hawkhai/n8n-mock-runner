@@ -63,6 +63,7 @@ echo.
 echo [4/4] Running sqlite-demo.ts...
 echo ============================================================
 pushd "%MOCK_DIR%"
+set NODE_OPTIONS=--no-deprecation
 npx ts-node examples\sqlite-demo.ts
 set EXIT_CODE=!errorlevel!
 popd
