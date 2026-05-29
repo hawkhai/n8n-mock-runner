@@ -53,7 +53,4 @@ export type {
   NodePropertyTypes,
 } from './n8n-types';
 
-export type {
-  INodeOperationErrorOptions,
-  INodeApiErrorOptions,
-} from './n8n-runtime';
+export type { INodeOperationErrorOptions, INodeApiErrorOptions } from './n8n-runtime';

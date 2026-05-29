@@ -15,12 +15,7 @@
  */
 
 import axios from 'axios';
-import type {
-  IDataObject,
-  INodeExecutionData,
-  INodeProperties,
-  INodeType,
-} from './n8n-types';
+import type { IDataObject, INodeExecutionData, INodeProperties, INodeType } from './n8n-types';
 
 import { normalizeItems, returnJsonArray } from './helpers';
 import type { RunNodeOptions, RunNodeResult } from './types';
@@ -205,12 +200,7 @@ export async function runRoutingNode(
   nodeType: INodeType,
   opts: RunNodeOptions,
 ): Promise<RunNodeResult> {
-  const {
-    parameters,
-    credentials = {},
-    items,
-    httpInterceptor,
-  } = opts;
+  const { parameters, credentials = {}, items, httpInterceptor } = opts;
 
   const inputItems = items?.length
     ? normalizeItems(items as IDataObject[])

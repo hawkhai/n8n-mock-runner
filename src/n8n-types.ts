@@ -17,7 +17,19 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type IDataObject = {
-  [key: string]: IDataObject | IDataObject[] | string | string[] | number | number[] | boolean | boolean[] | null | undefined | Date | unknown;
+  [key: string]:
+    | IDataObject
+    | IDataObject[]
+    | string
+    | string[]
+    | number
+    | number[]
+    | boolean
+    | boolean[]
+    | null
+    | undefined
+    | Date
+    | unknown;
 };
 
 export interface IPairedItemData {
@@ -258,8 +270,24 @@ export interface INodeTypeDescription {
   version: number | number[];
   description: string;
   defaults: { name: string; color?: string };
-  inputs: Array<NodeConnectionType | { type: NodeConnectionType; displayName?: string; required?: boolean; maxConnections?: number }>;
-  outputs: Array<NodeConnectionType | { type: NodeConnectionType; displayName?: string; required?: boolean; maxConnections?: number }>;
+  inputs: Array<
+    | NodeConnectionType
+    | {
+        type: NodeConnectionType;
+        displayName?: string;
+        required?: boolean;
+        maxConnections?: number;
+      }
+  >;
+  outputs: Array<
+    | NodeConnectionType
+    | {
+        type: NodeConnectionType;
+        displayName?: string;
+        required?: boolean;
+        maxConnections?: number;
+      }
+  >;
   credentials?: INodeCredentialDescription[];
   requestDefaults?: INodeRoutingRequest & IDataObject;
   properties: INodeProperties[];
@@ -373,7 +401,13 @@ export type WorkflowExecuteMode =
   | 'trigger'
   | 'webhook';
 
-export type ActivationMode = 'init' | 'create' | 'update' | 'activate' | 'manual' | 'leadershipChange';
+export type ActivationMode =
+  | 'init'
+  | 'create'
+  | 'update'
+  | 'activate'
+  | 'manual'
+  | 'leadershipChange';
 
 export interface IWorkflowSettings {
   timezone?: string;
@@ -444,8 +478,16 @@ export interface IExecuteFunctions {
   // ── AI / tool features ────────────────────────────────────────
   logAiEvent(eventName: string, msg?: string): void;
   addInputData(connectionType: NodeConnectionType, data: INodeExecutionData[][]): { index: number };
-  addOutputData(connectionType: NodeConnectionType, currentNodeRunIndex: number, data: INodeExecutionData[][]): void;
-  getInputConnectionData(inputName: NodeConnectionType, itemIndex: number, inputIndex?: number): Promise<unknown>;
+  addOutputData(
+    connectionType: NodeConnectionType,
+    currentNodeRunIndex: number,
+    data: INodeExecutionData[][],
+  ): void;
+  getInputConnectionData(
+    inputName: NodeConnectionType,
+    itemIndex: number,
+    inputIndex?: number,
+  ): Promise<unknown>;
   isToolExecution(): boolean;
   isStreaming(): boolean;
   sendMessageToUI(...args: unknown[]): void;
@@ -507,7 +549,10 @@ export interface ILoadOptionsFunctions {
   getCurrentNodeParameter(parameterName: string): unknown;
   getNode(): INode;
   getTimezone(): string;
-  helpers: Pick<IExecuteFunctionsHelpers, 'httpRequest' | 'request' | 'httpRequestWithAuthentication' | 'requestWithAuthentication'>;
+  helpers: Pick<
+    IExecuteFunctionsHelpers,
+    'httpRequest' | 'request' | 'httpRequestWithAuthentication' | 'requestWithAuthentication'
+  >;
 }
 
 export interface INodeType {
@@ -517,8 +562,18 @@ export interface INodeType {
   trigger?(this: IExecuteFunctions): Promise<(() => Promise<void>) | undefined>;
   methods?: {
     loadOptions?: Record<string, (this: ILoadOptionsFunctions) => Promise<INodePropertyOptions[]>>;
-    listSearch?: Record<string, (this: ILoadOptionsFunctions, filter?: string, paginationToken?: unknown) => Promise<INodeListSearchResult>>;
-    credentialTest?: Record<string, (this: IExecuteFunctions, credential: IDataObject) => Promise<ICredentialTestResult>>;
+    listSearch?: Record<
+      string,
+      (
+        this: ILoadOptionsFunctions,
+        filter?: string,
+        paginationToken?: unknown,
+      ) => Promise<INodeListSearchResult>
+    >;
+    credentialTest?: Record<
+      string,
+      (this: IExecuteFunctions, credential: IDataObject) => Promise<ICredentialTestResult>
+    >;
   };
 }
 

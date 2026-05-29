@@ -75,9 +75,9 @@ describe('runNode()', () => {
       },
     };
 
-    await expect(
-      runNode({ node: noExecNode as any, parameters: {} }),
-    ).rejects.toThrow(/no execute\(\) method/i);
+    await expect(runNode({ node: noExecNode as any, parameters: {} })).rejects.toThrow(
+      /no execute\(\) method/i,
+    );
   });
 });
 
@@ -105,7 +105,7 @@ describe('getNodeParameter()', () => {
   it('falls back to provided default when parameter is missing', async () => {
     const result = await runNode({
       node: new ExampleNode(),
-      parameters: {},   // myString not set → defaults to ''
+      parameters: {}, // myString not set → defaults to ''
     });
 
     // ExampleNode sets myString from getNodeParameter('myString', i, '')
@@ -242,7 +242,17 @@ describe('credentials', () => {
     let capturedCreds: Record<string, unknown> = { placeholder: true };
 
     const credNode: any = {
-      description: { displayName: '', name: '', group: [], version: 1, description: '', defaults: {}, inputs: [], outputs: [], properties: [] },
+      description: {
+        displayName: '',
+        name: '',
+        group: [],
+        version: 1,
+        description: '',
+        defaults: {},
+        inputs: [],
+        outputs: [],
+        properties: [],
+      },
       async execute(this: any) {
         capturedCreds = await this.getCredentials('unknownType');
         return [[{ json: {} }]];
@@ -264,7 +274,17 @@ describe('credentialTypes (IAuthenticateGeneric)', () => {
     const interceptor = vi.fn().mockResolvedValue({ ok: true });
 
     const authNode: any = {
-      description: { displayName: '', name: '', group: [], version: 1, description: '', defaults: {}, inputs: [], outputs: [], properties: [] },
+      description: {
+        displayName: '',
+        name: '',
+        group: [],
+        version: 1,
+        description: '',
+        defaults: {},
+        inputs: [],
+        outputs: [],
+        properties: [],
+      },
       async execute(this: any) {
         const data = await this.helpers.httpRequestWithAuthentication('githubApi', {
           method: 'GET',

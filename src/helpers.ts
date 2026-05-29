@@ -40,9 +40,7 @@ export function constructExecutionMetaData(
 /**
  * Normalise items that may be raw JSON objects or proper INodeExecutionData.
  */
-export function normalizeItems(
-  items: INodeExecutionData[] | IDataObject[],
-): INodeExecutionData[] {
+export function normalizeItems(items: INodeExecutionData[] | IDataObject[]): INodeExecutionData[] {
   return (items as Array<INodeExecutionData | IDataObject>).map((item) => {
     if (item && typeof item === 'object' && 'json' in item) {
       return item as INodeExecutionData;

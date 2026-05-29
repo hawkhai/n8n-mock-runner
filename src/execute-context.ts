@@ -15,7 +15,12 @@ import get from 'lodash/get';
 import type { IDataObject, INodeExecutionData } from './n8n-types';
 
 import { constructExecutionMetaData, normalizeItems, returnJsonArray } from './helpers';
-import type { CredentialsMap, CredentialTypeMap, HttpRequestInterceptor, RunNodeOptions } from './types';
+import type {
+  CredentialsMap,
+  CredentialTypeMap,
+  HttpRequestInterceptor,
+  RunNodeOptions,
+} from './types';
 
 export class NotImplementedError extends Error {
   constructor(methodName: string) {
@@ -30,10 +35,7 @@ export class NotImplementedError extends Error {
 /**
  * Build the INode-like object the node sees via `this.getNode()`.
  */
-function buildFakeNode(
-  nodeType: string,
-  parameters: IDataObject,
-): Record<string, unknown> {
+function buildFakeNode(nodeType: string, parameters: IDataObject): Record<string, unknown> {
   return {
     id: 'mock-node-id',
     name: nodeType.split('.').pop() ?? 'MockNode',
@@ -49,9 +51,7 @@ function buildFakeNode(
  *   - plain objects:  [{ name: 'Alice' }]
  *   - n8n items:      [{ json: { name: 'Alice' } }]
  */
-function normalizeInputItems(
-  items: RunNodeOptions['items'],
-): INodeExecutionData[] {
+function normalizeInputItems(items: RunNodeOptions['items']): INodeExecutionData[] {
   if (!items || items.length === 0) {
     return [{ json: {} }];
   }
@@ -105,9 +105,8 @@ function applyCredentialAuth(
   const merged: IDataObject = { ...requestOptions };
 
   const interpolate = (tpl: string) =>
-    tpl.replace(
-      /\{\{[\s]*\$credentials\.(\w+)[\s]*\}\}/g,
-      (_, field: string) => String(credValues[field] ?? ''),
+    tpl.replace(/\{\{[\s]*\$credentials\.(\w+)[\s]*\}\}/g, (_, field: string) =>
+      String(credValues[field] ?? ''),
     );
 
   if (props.headers) {
@@ -185,25 +184,27 @@ export function createExecuteContext(opts: RunNodeOptions) {
 
     request: async (uriOrObject: string | IDataObject, options?: IDataObject) => {
       const opts2: IDataObject =
-        typeof uriOrObject === 'string'
-          ? { url: uriOrObject, ...(options ?? {}) }
-          : uriOrObject;
+        typeof uriOrObject === 'string' ? { url: uriOrObject, ...(options ?? {}) } : uriOrObject;
       return doHttpRequest(opts2, httpInterceptor);
     },
 
-    requestWithAuthentication: async (
-      credentialType: string,
-      requestOptions: IDataObject,
-    ) => {
-      const withAuth = applyCredentialAuth(requestOptions, credentialType, credentials, credentialTypes);
+    requestWithAuthentication: async (credentialType: string, requestOptions: IDataObject) => {
+      const withAuth = applyCredentialAuth(
+        requestOptions,
+        credentialType,
+        credentials,
+        credentialTypes,
+      );
       return doHttpRequest(withAuth, httpInterceptor);
     },
 
-    httpRequestWithAuthentication: async (
-      credentialType: string,
-      requestOptions: IDataObject,
-    ) => {
-      const withAuth = applyCredentialAuth(requestOptions, credentialType, credentials, credentialTypes);
+    httpRequestWithAuthentication: async (credentialType: string, requestOptions: IDataObject) => {
+      const withAuth = applyCredentialAuth(
+        requestOptions,
+        credentialType,
+        credentials,
+        credentialTypes,
+      );
       return doHttpRequest(withAuth, httpInterceptor);
     },
 
@@ -255,31 +256,53 @@ export function createExecuteContext(opts: RunNodeOptions) {
     },
 
     // ---- node metadata ----
-    getNode() { return fakeNode; },
+    getNode() {
+      return fakeNode;
+    },
 
     getWorkflow() {
       return { id: 'mock-workflow', name: 'Mock Workflow', active: false };
     },
 
-    getWorkflowSettings() { return {}; },
+    getWorkflowSettings() {
+      return {};
+    },
 
-    getWorkflowStaticData(_type: string) { return {}; },
+    getWorkflowStaticData(_type: string) {
+      return {};
+    },
 
-    getMode() { return mode; },
+    getMode() {
+      return mode;
+    },
 
-    getActivationMode() { return 'manual'; },
+    getActivationMode() {
+      return 'manual';
+    },
 
-    getTimezone() { return timezone; },
+    getTimezone() {
+      return timezone;
+    },
 
-    getExecutionId() { return 'mock-execution-id'; },
+    getExecutionId() {
+      return 'mock-execution-id';
+    },
 
-    getRestApiUrl() { return 'http://localhost:5678/api/v1'; },
+    getRestApiUrl() {
+      return 'http://localhost:5678/api/v1';
+    },
 
-    getInstanceBaseUrl() { return 'http://localhost:5678'; },
+    getInstanceBaseUrl() {
+      return 'http://localhost:5678';
+    },
 
-    getInstanceId() { return 'mock-instance'; },
+    getInstanceId() {
+      return 'mock-instance';
+    },
 
-    getSignedResumeUrl() { return 'http://localhost:5678/resume'; },
+    getSignedResumeUrl() {
+      return 'http://localhost:5678/resume';
+    },
 
     // ---- credentials ----
     async getCredentials(type: string) {
@@ -287,15 +310,23 @@ export function createExecuteContext(opts: RunNodeOptions) {
       return {};
     },
 
-    getCredentialsProperties(_type: string) { return []; },
+    getCredentialsProperties(_type: string) {
+      return [];
+    },
 
     // ---- error handling ----
-    continueOnFail() { return continueOnFailFlag; },
+    continueOnFail() {
+      return continueOnFailFlag;
+    },
 
     // ---- context / metadata ----
-    getContext(_type: string) { return {}; },
+    getContext(_type: string) {
+      return {};
+    },
 
-    setMetadata(_metadata: unknown) { /* noop */ },
+    setMetadata(_metadata: unknown) {
+      /* noop */
+    },
 
     getExecuteData() {
       return {
@@ -305,45 +336,85 @@ export function createExecuteContext(opts: RunNodeOptions) {
       };
     },
 
-    evaluateExpression(expression: string, _itemIndex: number) { return expression; },
+    evaluateExpression(expression: string, _itemIndex: number) {
+      return expression;
+    },
 
-    getWorkflowDataProxy(_itemIndex: number) { return {}; },
+    getWorkflowDataProxy(_itemIndex: number) {
+      return {};
+    },
 
-    getInputSourceData() { return { previousNode: undefined }; },
+    getInputSourceData() {
+      return { previousNode: undefined };
+    },
 
-    getExecutionCancelSignal() { return undefined; },
+    getExecutionCancelSignal() {
+      return undefined;
+    },
 
-    onExecutionCancellation(_handler: () => unknown) { /* noop */ },
+    onExecutionCancellation(_handler: () => unknown) {
+      /* noop */
+    },
 
-    logAiEvent(_eventName: string, _msg?: string) { /* noop */ },
+    logAiEvent(_eventName: string, _msg?: string) {
+      /* noop */
+    },
 
-    getChildNodes(_nodeName: string) { return []; },
+    getChildNodes(_nodeName: string) {
+      return [];
+    },
 
-    getParentNodes(_nodeName: string) { return []; },
+    getParentNodes(_nodeName: string) {
+      return [];
+    },
 
-    getKnownNodeTypes() { return {}; },
+    getKnownNodeTypes() {
+      return {};
+    },
 
-    getChatTrigger() { return null; },
+    getChatTrigger() {
+      return null;
+    },
 
-    isNodeFeatureEnabled(_featureName: string) { return false; },
+    isNodeFeatureEnabled(_featureName: string) {
+      return false;
+    },
 
-    getExecutionContext() { return undefined; },
+    getExecutionContext() {
+      return undefined;
+    },
 
-    sendMessageToUI(..._args: unknown[]) { /* noop */ },
+    sendMessageToUI(..._args: unknown[]) {
+      /* noop */
+    },
 
-    async sendResponse(_response: unknown) { /* noop */ },
+    async sendResponse(_response: unknown) {
+      /* noop */
+    },
 
-    async sendChunk(_type: unknown, _itemIndex: number, _content?: unknown) { /* noop */ },
+    async sendChunk(_type: unknown, _itemIndex: number, _content?: unknown) {
+      /* noop */
+    },
 
-    isStreaming() { return false; },
+    isStreaming() {
+      return false;
+    },
 
-    isToolExecution() { return false; },
+    isToolExecution() {
+      return false;
+    },
 
-    addExecutionHints(..._hints: unknown[]) { /* noop */ },
+    addExecutionHints(..._hints: unknown[]) {
+      /* noop */
+    },
 
-    getNodeInputs() { return [{ type: 'main', index: 0 }]; },
+    getNodeInputs() {
+      return [{ type: 'main', index: 0 }];
+    },
 
-    getNodeOutputs() { return [{ type: 'main', index: 0 }]; },
+    getNodeOutputs() {
+      return [{ type: 'main', index: 0 }];
+    },
 
     // ---- legacy compat (n8n-workflow < 1.0) ----
     async prepareOutputData(outputData: INodeExecutionData[]) {
@@ -359,8 +430,12 @@ export function createExecuteContext(opts: RunNodeOptions) {
       throw new NotImplementedError('getInputConnectionData');
     },
 
-    addInputData() { return { index: 0 }; },
-    addOutputData() { /* noop */ },
+    addInputData() {
+      return { index: 0 };
+    },
+    addOutputData() {
+      /* noop */
+    },
 
     // ---- nodeHelpers ----
     nodeHelpers: {
@@ -371,11 +446,21 @@ export function createExecuteContext(opts: RunNodeOptions) {
 
     // logger
     logger: {
-      debug: (..._args: unknown[]) => { /* noop */ },
-      info: (..._args: unknown[]) => { /* noop */ },
-      warn: (..._args: unknown[]) => { /* noop */ },
-      error: (..._args: unknown[]) => { /* noop */ },
-      verbose: (..._args: unknown[]) => { /* noop */ },
+      debug: (..._args: unknown[]) => {
+        /* noop */
+      },
+      info: (..._args: unknown[]) => {
+        /* noop */
+      },
+      warn: (..._args: unknown[]) => {
+        /* noop */
+      },
+      error: (..._args: unknown[]) => {
+        /* noop */
+      },
+      verbose: (..._args: unknown[]) => {
+        /* noop */
+      },
     },
 
     customData: {},

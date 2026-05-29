@@ -130,8 +130,8 @@ export class NodeApiError extends Error {
         options.message ??
         String(
           (errorOrMessage as Record<string, unknown>).message ??
-          (errorOrMessage as Record<string, unknown>).error ??
-          'Unknown API error',
+            (errorOrMessage as Record<string, unknown>).error ??
+            'Unknown API error',
         );
     }
 

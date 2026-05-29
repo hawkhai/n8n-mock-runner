@@ -1,9 +1,4 @@
-import type {
-  IDataObject,
-  INodeExecutionData,
-  INodeType,
-  IVersionedNodeType,
-} from './n8n-types';
+import type { IDataObject, INodeExecutionData, INodeType, IVersionedNodeType } from './n8n-types';
 
 export type { IDataObject, INodeExecutionData, INodeType, IVersionedNodeType };
 

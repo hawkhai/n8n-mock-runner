@@ -54,10 +54,10 @@ export async function runNode(opts: RunNodeOptions): Promise<RunNodeResult> {
   const nd = nodeType.description;
   console.log(
     `\n[n8n-mock-runner v${runnerVersion}] ` +
-    `node="${nd?.displayName ?? opts.nodeType}" ` +
-    `type="${nd?.name ?? '?'}" ` +
-    `nodeVersion=${nd?.version ?? '?'} ` +
-    `package="${opts.nodeType ?? '?'}"`,
+      `node="${nd?.displayName ?? opts.nodeType}" ` +
+      `type="${nd?.name ?? '?'}" ` +
+      `nodeVersion=${nd?.version ?? '?'} ` +
+      `package="${opts.nodeType ?? '?'}"`,
   );
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -77,9 +77,7 @@ export async function runNode(opts: RunNodeOptions): Promise<RunNodeResult> {
 
   // Support both modern (return value) and legacy (prepareOutputData) patterns
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rawResult = (await nodeType.execute.call(ctx as any)) as
-    | INodeExecutionData[][]
-    | undefined;
+  const rawResult = (await nodeType.execute.call(ctx as any)) as INodeExecutionData[][] | undefined;
 
   const resolved: INodeExecutionData[][] = rawResult
     ? Array.isArray(rawResult[0])
@@ -105,9 +103,7 @@ export async function runNode(opts: RunNodeOptions): Promise<RunNodeResult> {
  * // rows = [{ id: 1, name: 'Alice' }, ...]
  * ```
  */
-export async function runNodeJson(
-  opts: RunNodeOptions,
-): Promise<Record<string, unknown>[]> {
+export async function runNodeJson(opts: RunNodeOptions): Promise<Record<string, unknown>[]> {
   const result = await runNode(opts);
   return result.items.map((item) => item.json as Record<string, unknown>);
 }
