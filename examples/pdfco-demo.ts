@@ -17,14 +17,14 @@
 import { runNodeJson } from '../src';
 import type { IDataObject } from '../src';
 
-// ── Load n8n-nodes-pdfco from the sibling project (compiled dist) ─────────────
+// ── Load n8n-nodes-pdfco from node_modules ────────────────────────────────────
 let PdfCo: any;
 try {
-  PdfCo = require('../../n8n-nodes-pdfco/dist/nodes/PdfCo/PdfCo.node').PdfCo;
+  PdfCo = require('n8n-nodes-pdfco/dist/nodes/PdfCo/PdfCo.node').PdfCo;
 } catch {
   console.error(
-    '⚠  Could not load n8n-nodes-pdfco. Build it first:\n' +
-      '   cd F:\\source\\workflow\\n8n-nodes-pdfco && pnpm install && pnpm run build',
+    '⚠  Could not load n8n-nodes-pdfco.\n' +
+      '   Run: npm install  (in the n8n-mock-runner directory)',
   );
   process.exit(1);
 }
